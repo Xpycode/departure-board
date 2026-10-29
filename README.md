@@ -66,7 +66,14 @@ shows that honestly for its slot instead of being skipped.
 - The API filters products only by exclusion (`suburban=false&bus=false&...`); the widget builds those queries per block.
 - Shows minutes until departure (`now`, `3 min`, ...); absolute time with `*` if more than 60 minutes out.
 - Shows delay as `+2` in orange next to the time.
+- Shows the platform/track in a fixed column (realtime platform, falling back to the planned one). A platform that changed vs. plan is shown in orange.
+- The first still-catchable departure per direction (one that clears the lead time) is highlighted: orange accent bar, bold, `»` marker. Later departures are dimmed.
+- Cancelled trains are shown struck-through with "fällt aus" instead of a countdown, and are never highlighted as catchable.
+- A bicycle icon after the direction marks trains with confirmed bicycle conveyance (API `FK`/`gy` hints; hover for the exact remark).
+- Clock/date header (top right, no seconds — calmer at TV distance).
 - Departures are grouped per direction (terminus) — up to 2 directions, e.g. eastbound + westbound.
+- Offline resilience: each block keeps its last good data; if a refresh fails, that data stays on screen dimmed with an "Offline — times as of HH:MM" banner. A status dot next to the footer timestamp shows green (live), amber (a block failed this cycle) or red (no good data for 15+ minutes). Blocks are never blanked by transient errors.
+- 24/7 resilience: the widget reloads itself every 4 hours (config survives in URL params and localStorage), and sends a size message on every refresh cycle so the embedding page can detect a hung iframe (see the watchdog snippet below).
 - Info line: disruption warnings of the displayed trains (API "warning" remarks, e.g. line cancellations or construction replacements) rotate one at a time in a yellow line above the footer, with a position counter. Click the counter to jump to the next message, click the text to cycle scroll speed (1x → 2x → 4x); a completed scroll pass auto-advances. Hidden when there are none. HTML in remark texts (some are bare links) is flattened to `label: URL`. Text size is the `ts` setting.
 
 ## Deploying to the NUC
@@ -100,17 +107,27 @@ In your Icinga source, add the same fixed-position iframe pointing at the NUC fo
         scrolling="no"></iframe>
 ```
 
-The widget reports its rendered size after every refresh via `postMessage` (type `bvg-widget-size`, with `width`/`height`). To make the iframe auto-fit (recommended — it also tracks the display scale and any station changes), add this listener to the parent page:
+The widget reports its rendered size after every refresh via `postMessage` (type `bvg-widget-size`, with `width`/`height`) — at least once per 30-second cycle even when the size is unchanged, so the messages double as a heartbeat. To make the iframe auto-fit (recommended — it also tracks the display scale and any station changes) and recover a hung widget, add this listener to the parent page:
 
 ```html
 <script>
+  var lastBeat = Date.now();
   window.addEventListener("message", function (e) {
     if (e.data && e.data.type === "bvg-widget-size") {
+      lastBeat = Date.now();
       var f = document.getElementById("bvg-widget");
       f.style.width = e.data.width + "px";
       f.style.height = e.data.height + "px";
     }
   });
+  // Watchdog: no heartbeat for 3 minutes = force-reload the widget iframe.
+  setInterval(function () {
+    if (Date.now() - lastBeat > 3 * 60 * 1000) {
+      var f = document.getElementById("bvg-widget");
+      f.src = f.src;
+      lastBeat = Date.now();
+    }
+  }, 30000);
 </script>
 ```
 
@@ -118,5 +135,6 @@ The widget reports its rendered size after every refresh via `postMessage` (type
 
 ## Notes
 
+- For TV viewing at ~3 m distance, signage guidance puts the minimum readable text at roughly 16 px; at the widget's default scale (13 px rows) that means `scale=1.5` on the NUC is a good starting point. The auto-fit listener handles the resulting larger frame automatically.
 - The widget sets `background: transparent` on `body` so it blends into the Icinga page; for a standalone look, give `.widget` your desired backdrop in `departures.html`.
-- Height ~300px fits two stations with 2 departures each; the full three-block widget (S, U, RE) needs roughly 320px at scale 1. Use the auto-fit listener or adjust the iframe height if you change `n` or `scale`.
+- Height ~300px fits two stations with 2 departures each; the full three-block widget (S, U, RE) plus clock and info line needs roughly 360px at scale 1. Use the auto-fit listener or adjust the iframe height if you change `n` or `scale`.

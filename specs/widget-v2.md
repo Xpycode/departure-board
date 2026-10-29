@@ -1,6 +1,6 @@
 # Departure Widget v2 — Readability & Resilience Specification
 
-**Status:** Review
+**Status:** Complete (implemented; TV-distance verification pending)
 **Created:** 2026-10-29
 **Last Updated:** 2026-10-29
 
@@ -211,12 +211,12 @@ Explicitly excluded from this spec:
 
 | Question | Status | Answer |
 |----------|--------|--------|
-| Highlight styling: accent bar + `»` acceptable, or prefer BVG-style treatment? | Open | — |
-| Scheduled reload interval: 4 h proposed; 12 h also defensible | Open | — |
-| S badge contrast fix: darker green (`#007a41`) vs heavier text? | Open | — |
-| Heartbeat: reuse `bvg-widget-size` guaranteed-per-cycle vs new dedicated message type? | Open | — |
-| Should the header clock show seconds? (more change = more burn-in variation, less calm) | Open | — |
-| "fällt aus" tag wording (German) vs "cancelled" (English)? | Open | — |
+| Highlight styling: accent bar + `»` acceptable, or prefer BVG-style treatment? | Resolved | Accent bar + bold + `»` (default accepted by user) |
+| Scheduled reload interval: 4 h proposed; 12 h also defensible | Resolved | 4 h (default accepted by user) |
+| S badge contrast fix: darker green (`#007a41`) vs heavier text? | Resolved | Darker green `#007a41` (default accepted by user) |
+| Heartbeat: reuse `bvg-widget-size` guaranteed-per-cycle vs new dedicated message type? | Resolved | Guaranteed `bvg-widget-size` report once per 30 s cycle (default accepted by user) |
+| Should the header clock show seconds? (more change = more burn-in variation, less calm) | Resolved | No seconds — `HH:MM` (default accepted by user) |
+| "fällt aus" tag wording (German) vs "cancelled" (English)? | Resolved | German "fällt aus" (default accepted by user) |
 
 ---
 

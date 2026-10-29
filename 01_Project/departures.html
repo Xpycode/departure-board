@@ -11,7 +11,7 @@
     --border: #2a3441;
     --text: #e8edf4;
     --dim: #8ea0b5;
-    --s-color: #008d4b;
+    --s-color: #007a41;
     --u-color: #005a94;
     --r-color: #b03030;
     --warn: #ffb347;
@@ -101,6 +101,36 @@
   td.when { text-align: right; font-weight: 700; white-space: nowrap; }
   td.when.soon { color: var(--warn); }
   td.when .delay { font-weight: 400; font-size: calc(11px * var(--scale)); color: var(--warn); margin-left: calc(3px * var(--scale)); }
+  td.plat { text-align: right; font-weight: 700; white-space: nowrap; padding-right: calc(7px * var(--scale)); }
+  td.plat.changed { color: var(--warn); }
+  tr.later td.when { font-weight: 400; color: var(--dim); }
+  tr.later td.when .delay { color: var(--dim); }
+  tr.catch td.line { box-shadow: inset calc(3px * var(--scale)) 0 0 var(--warn); }
+  tr.cancelled td.line, tr.cancelled td.dir { text-decoration: line-through; }
+  tr.cancelled td.when, tr.cancelled td.plat, tr.cancelled td.dir { color: var(--dim); font-weight: 400; }
+  td.when .cx { color: var(--warn); font-weight: 600; font-size: calc(11px * var(--scale)); }
+  td.dir .hint { margin-left: calc(4px * var(--scale)); }
+  td.dir .hint svg { vertical-align: calc(-2px * var(--scale)); opacity: .7; }
+  .clock {
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: calc(6px * var(--scale));
+    padding: calc(7px * var(--scale)) calc(12px * var(--scale)) calc(2px * var(--scale));
+  }
+  .clock .time { font-size: calc(15px * var(--scale)); font-weight: 700; }
+  .clock .date { font-size: calc(10px * var(--scale)); color: var(--dim); }
+  .station.stale .station-head, .station.stale table { opacity: .5; }
+  .station .offline { color: var(--warn); font-size: calc(10px * var(--scale)); padding-bottom: calc(3px * var(--scale)); }
+  .footer .dot {
+    width: calc(7px * var(--scale));
+    height: calc(7px * var(--scale));
+    border-radius: 50%;
+    background: #3fbf6f;
+    display: inline-block;
+  }
+  .footer .dot.amber { background: var(--warn); }
+  .footer .dot.red { background: #d53838; }
   .ticker {
     display: flex;
     align-items: stretch;
@@ -194,6 +224,10 @@
 </head>
 <body>
 <div class="widget" id="widget">
+  <div class="clock">
+    <span class="date" id="clock-date"></span>
+    <span class="time" id="clock-time"></span>
+  </div>
   <div class="station" id="station-s"></div>
   <div class="station" id="station-u"></div>
   <div class="station" id="station-r"></div>
@@ -202,6 +236,7 @@
     <span id="status">loading…</span>
     <span class="right">
       <button class="cfg-btn" id="cfg-open" title="Configure stations">setup</button>
+      <span class="dot" id="dot"></span>
       <span id="updated"></span>
     </span>
   </div>
@@ -278,8 +313,18 @@
   document.documentElement.style.setProperty("--ts", TICKER_SIZE + "px");
   var API = "https://v6.bvg.transport.rest";
   var REFRESH_MS = 30000;
+  // 24/7 resilience: reload the page every 4 h to reset the heap
+  // (long-lived dashboard tabs are a documented leak/crash risk);
+  // data older than 15 min counts as stale (red status dot).
+  var RELOAD_AFTER_MS = 4 * 60 * 60 * 1000;
+  var STALE_RED_MS = 15 * 60 * 1000;
+  // Fixed hint-code -> icon map (verified live: FK = "Bicycle conveyance",
+  // gy = bike-scheme train). Unmapped hint codes are ignored by design.
+  var HINT_ICONS = { "FK": "bike", "gy": "bike" };
+  var BIKE_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M5.5 17.5 L9.5 9.5 h5.5 l3.5 8 M9.5 9.5 l2.5-5 h3.5"/></svg>';
   var ROTATE_MS = 20000;
   var rIndex = 0;
+  var lastReportedSize = "";
   // Product filtering on the BVG v6 API: the per-product booleans
   // (suburban, subway, tram, bus, ferry, express, regional) are include
   // flags that all default to true, so filtering happens by excluding
@@ -319,6 +364,43 @@
     return new Date(dep.when || dep.plannedWhen).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " *";
   }
 
+  // A departure is cancelled when it carries a cancel status remark
+  // (text.realtime.journey.cancelled / text.realtime.stop.cancelled).
+  // when === null alone is not sufficient (also used for live-data gaps).
+  function isCancelled(dep) {
+    return (dep.remarks || []).some(function (r) {
+      return r.type === "status" && String(r.code || "").indexOf("cancelled") !== -1;
+    });
+  }
+
+  // Platform changed when the API says so (platformChange status remark)
+  // or when the realtime platform differs from the planned one.
+  function platformChanged(dep) {
+    var remark = (dep.remarks || []).some(function (r) {
+      return r.type === "status" && String(r.code || "").indexOf("platformChange") !== -1;
+    });
+    return remark || (!!dep.platform && !!dep.plannedPlatform && dep.platform !== dep.plannedPlatform);
+  }
+
+  // Trim a platform string to its number ("1 (U8)" -> "1", "Pos. 15" -> "15").
+  function platformNum(p) {
+    var m = /\d+/.exec(String(p || ""));
+    return m ? m[0] : null;
+  }
+
+  // Inline hint icons after the direction text; deduped by icon kind.
+  function hintIcons(dep) {
+    var out = "", seen = {};
+    (dep.remarks || []).forEach(function (r) {
+      var icon = r.type === "hint" && HINT_ICONS[r.code];
+      if (icon && !seen[icon]) {
+        seen[icon] = true;
+        out += '<span class="hint" title="' + escapeHtml(r.text || r.code) + '">' + BIKE_SVG + "</span>";
+      }
+    });
+    return out;
+  }
+
   // Departures to display for a block: right product, not leaving sooner
   // than the lead time, and matching the optional line filter.
   function usableDepartures(cfg, data) {
@@ -340,7 +422,7 @@
     });
   }
 
-  function renderStation(cfg, data) {
+  function renderStation(cfg, data, staleAt) {
     var departures = usableDepartures(cfg, data);
 
     // Collect system-wide disruption messages ("warning" remarks) of the
@@ -365,19 +447,38 @@
 
     var rows = "";
     dirs.slice(0, 2).forEach(function (dir) {
+      var marked = false;
       seen[dir].forEach(function (d) {
         var m = mins(d);
         var delay = "";
         if (d.delay && d.delay > 0) delay = "+" + Math.round(d.delay / 60);
-        var cls = m <= 2 ? " soon" : "";
+        var cancelled = isCancelled(d);
+        // First non-cancelled departure of a direction is the catchable
+        // train: accent bar, bold, » marker. Later rows dim, cancelled
+        // rows render struck-through with "fällt aus".
+        var catchRow = !cancelled && !marked;
+        if (catchRow) marked = true;
+        var rowCls = cancelled ? "cancelled" : catchRow ? "catch" : "later";
+        var soon = m <= 2 && !cancelled;
         var lineName = (d.line.name || "").replace(/^(S|U)-?Bahn\s*/i, "");
         var lineCls = cfg.kind || "regional";
-        rows += "<tr>" +
+
+        // Platform: realtime -> planned -> empty cell (stable column width);
+        // a changed platform stands out in warn color.
+        var plat = platformNum(d.platform) || platformNum(d.plannedPlatform);
+        var platHtml = '<td class="plat' + (platformChanged(d) ? " changed" : "") + '">' +
+          (plat ? escapeHtml(plat) : "") + "</td>";
+
+        var whenHtml = cancelled
+          ? '<td class="when"><span class="cx">fällt aus</span></td>'
+          : '<td class="when' + (soon ? " soon" : "") + '">' +
+            (catchRow ? "» " : "") + fmt(d) +
+            '<span class="delay">' + delay + "</span></td>";
+
+        rows += '<tr class="' + rowCls + '">' +
           '<td class="line"><span class="' + lineCls + '">' + lineName + "</span></td>" +
-          '<td class="dir" title="' + escapeHtml(dir) + '">' + escapeHtml(dir) + "</td>" +
-          '<td class="when' + cls + '">' + fmt(d) +
-          '<span class="delay">' + delay + "</span></td>" +
-          "</tr>";
+          '<td class="dir" title="' + escapeHtml(dir) + '">' + escapeHtml(dir) +
+          hintIcons(d) + "</td>" + platHtml + whenHtml + "</tr>";
       });
     });
 
@@ -389,7 +490,12 @@
       head += '<span class="r-countdown" id="r-countdown"></span>';
     }
     head += "</div>";
-    cfg.el.innerHTML = head +
+    cfg.el.classList.toggle("stale", !!staleAt);
+    var banner = staleAt
+      ? '<div class="offline">Offline — times as of ' +
+        new Date(staleAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + "</div>"
+      : "";
+    cfg.el.innerHTML = banner + head +
       (rows
         ? "<table><tbody>" + rows + "</tbody></table>"
         : '<div class="station-error">No departures in the next ' +
@@ -517,6 +623,26 @@
     el.style.color = isErr ? "var(--warn)" : "";
   }
 
+  // Freshness: the footer stamp updates only on successful fetches, and a
+  // status dot beside it shows block health — green = live, amber = a
+  // failed refresh in the current cycle, red = no good data for 15 min.
+  var dotEl = document.getElementById("dot");
+  function markUpdated() {
+    document.getElementById("updated").textContent =
+      new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+  function updateHealth() {
+    var red = false, amber = false;
+    [STOPS[0], STOPS[1], regionalCfg].forEach(function (c) {
+      if (c.lastGoodAt && Date.now() - c.lastGoodAt > STALE_RED_MS) red = true;
+      if (c.failed) amber = true;
+    });
+    dotEl.className = "dot" + (red ? " red" : amber ? " amber" : "");
+    if (red) setStatus("offline", true);
+    else if (amber) setStatus("BVG live · offline block", true);
+    else setStatus("BVG live");
+  }
+
   function ibnrFromId(id) {
     var m = /[0-9]{6,}/.exec(String(id || ""));
     return m ? m[0] : null;
@@ -546,15 +672,36 @@
       .then(function (id) {
         return fetchJSON(API + "/stops/" + encodeURIComponent(id) + "/departures?" + query);
       })
-      .then(function (data) { renderStation(cfg, data); return data; })
+      .then(function (data) {
+        // Last-good data per requested stop: on fetch failures the block
+        // keeps showing its last good data dimmed, with a banner naming
+        // its age (per-stop so the RE rotation never shows one station's
+        // data under another station's name).
+        cfg.lastGoodByStop = cfg.lastGoodByStop || {};
+        cfg.lastGoodByStop[stop] = { data: data, at: Date.now() };
+        cfg.lastGoodAt = Date.now();
+        cfg.failed = false;
+        markUpdated();
+        renderStation(cfg, data);
+        updateHealth();
+        return data;
+      })
       .catch(function (err) {
+        cfg.failed = true;
+        var lg = cfg.lastGoodByStop && cfg.lastGoodByStop[stop];
+        if (lg) {
+          renderStation(cfg, lg.data, lg.at);
+          updateHealth();
+          return;
+        }
         cfg.warnings = [];
+        cfg.el.classList.remove("stale");
         cfg.el.innerHTML =
           '<div class="station-head"><span class="badge ' + cfg.key + '">' + cfg.label +
           '</span><span class="station-name">' + escapeHtml(stop) + "</span></div>" +
           '<div class="station-error">API error: ' + escapeHtml(err.message) + "</div>";
-        setStatus("API error", true);
         updateTicker();
+        updateHealth();
       });
   }
 
@@ -580,9 +727,9 @@
       loadDepartures(cfg, cfg.stop, "results=20&duration=30&remarks=true&" + productsQuery([cfg.kind]));
     });
     loadRegional();
-    document.getElementById("updated").textContent =
-      new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    setStatus("BVG live");
+    // Heartbeat: guarantee one size report per refresh cycle so the
+    // embedding page can detect a hung widget (no message = dead iframe).
+    heartbeat();
   }
 
   // Built-in setup panel: configure stations in the browser; saved to
@@ -631,6 +778,20 @@
 
   refresh();
   setInterval(refresh, REFRESH_MS);
+  // 24/7 self-reload: reset the heap before long-lived-tab leaks can
+  // crash the page (config survives in URL params and localStorage).
+  setTimeout(function () { location.reload(); }, RELOAD_AFTER_MS);
+  // Header clock: ticks every second, but only the text nodes change.
+  var clockTime = document.getElementById("clock-time");
+  var clockDate = document.getElementById("clock-date");
+  function tickClock() {
+    var now = new Date();
+    clockTime.textContent = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    clockDate.textContent =
+      now.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
   if (REGIONAL_STOPS.length > 1) {
     // One ticker drives the RE rotation: counts down to the next station
     // switch and shows the remaining seconds in the RE block header. Every
@@ -659,7 +820,6 @@
   // the current iframe size, which froze the frame at its largest size.
   // Only posts when the size actually changed, so renders that keep the
   // layout (routine refreshes, ticker updates) do not touch the frame.
-  var lastReportedSize = "";
   function notifySize() {
     if (window.parent === window) return;
     var box = document.getElementById("widget");
@@ -667,6 +827,16 @@
     var key = w + "x" + h;
     if (key === lastReportedSize) return;
     lastReportedSize = key;
+    window.parent.postMessage({ type: "bvg-widget-size", width: w, height: h }, "*");
+  }
+  // Unconditional variant for the 30 s heartbeat (see refresh): the
+  // parent page treats silence as a hung widget and force-reloads the
+  // iframe.
+  function heartbeat() {
+    if (window.parent === window) return;
+    var box = document.getElementById("widget");
+    var w = box.offsetWidth, h = box.offsetHeight;
+    lastReportedSize = w + "x" + h;
     window.parent.postMessage({ type: "bvg-widget-size", width: w, height: h }, "*");
   }
   new MutationObserver(notifySize).observe(document.getElementById("widget"),

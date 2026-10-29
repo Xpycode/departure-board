@@ -82,13 +82,24 @@
   // Auto-fit the widget iframe: the widget reports its rendered size after
   // every refresh (and when its scale setting changes), so the frame always
   // encloses the content exactly. The initial 340x300 is a placeholder.
+  // The size messages double as a heartbeat: if none arrive for 3 minutes,
+  // the widget iframe is considered hung and force-reloaded.
+  var lastBeat = Date.now();
   window.addEventListener("message", function (e) {
     if (e.data && e.data.type === "bvg-widget-size") {
+      lastBeat = Date.now();
       var frame = document.getElementById("widget");
       frame.style.width = e.data.width + "px";
       frame.style.height = e.data.height + "px";
     }
   });
+  setInterval(function () {
+    if (Date.now() - lastBeat > 3 * 60 * 1000) {
+      var frame = document.getElementById("widget");
+      frame.src = frame.src;
+      lastBeat = Date.now();
+    }
+  }, 30000);
 </script>
 
 <script>
