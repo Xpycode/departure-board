@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitoring Dashboard (Icinga stand-in)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #161b22;
+    color: #e8edf4;
+    overflow: hidden;
+  }
+  header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 20px;
+    background: #0d1117;
+    border-bottom: 1px solid #2a3441;
+    font-size: 14px;
+  }
+  header .logo { font-weight: 700; color: #ff4d4d; letter-spacing: 1px; }
+  header .crumb { color: #8ea0b5; }
+  header .spacer { flex: 1; }
+  header .clock { color: #8ea0b5; font-variant-numeric: tabular-nums; }
+  main { padding: 20px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: #1a212b;
+    border: 1px solid #2a3441;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .card h2 { font-size: 13px; font-weight: 600; color: #8ea0b5; margin-bottom: 10px; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-top: 1px solid #222b36;
+    font-size: 14px;
+  }
+  .state {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 10px;
+  }
+  .ok    { background: rgba(0,141,75,.25);  color: #35d07f; }
+  .warn  { background: rgba(255,179,71,.2); color: #ffb347; }
+  .crit  { background: rgba(255,77,77,.2);  color: #ff6b6b; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">ICINGA</span>
+  <span class="crumb">Monitoring / Dashboard</span>
+  <span class="spacer"></span>
+  <span class="clock" id="clock"></span>
+</header>
+<main>
+  <div class="grid" id="grid"></div>
+</main>
+
+<iframe
+  id="widget"
+  src="departures.html"
+  style="position: fixed; left: 16px; bottom: 16px; width: 340px; height: 300px;
+         border: 0; background: transparent;"
+  title="BVG departures"
+  scrolling="no"></iframe>
+
+<script>
+  var services = [
+    ["web-01 / HTTP", "ok"], ["web-01 / Disk", "ok"], ["web-02 / HTTP", "ok"],
+    ["db-01 / MySQL", "ok"], ["db-01 / Replication Lag", "warn"], ["mail / SMTP", "ok"],
+    ["backup / Nightly Job", "crit"], ["nu-berlin / Ping", "ok"], ["nu-berlin / Chrome", "ok"],
+    ["vpn / Gateway", "ok"], ["printer / Floor 2", "warn"], ["wifi / Meeting Room", "ok"]
+  ];
+  var grid = document.getElementById("grid");
+  services.forEach(function (s) {
+    var card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = "<h2>Host Group / " + s[0].split(" /")[0] + "</h2>" +
+      '<div class="row"><span>' + s[0] + '</span>' +
+      '<span class="state ' + s[1] + '">' + s[1].toUpperCase() + "</span></div>";
+    grid.appendChild(card);
+  });
+
+  function tick() {
+    document.getElementById("clock").textContent =
+      new Date().toLocaleTimeString("de-DE") + " · " +
+      new Date().toLocaleDateString("de-DE");
+  }
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>

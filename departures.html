@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BVG Departures Widget</title>
+<style>
+  :root {
+    --bg: #11151c;
+    --panel: #1a212b;
+    --border: #2a3441;
+    --text: #e8edf4;
+    --dim: #8ea0b5;
+    --s-color: #008d4b;
+    --u-color: #005a94;
+    --warn: #ffb347;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; }
+  body {
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    width: 340px;
+  }
+  .widget {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 18px rgba(0,0,0,.45);
+  }
+  .station { padding: 8px 12px 10px; }
+  .station + .station { border-top: 1px solid var(--border); }
+  .station-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .badge {
+    display: inline-block;
+    min-width: 20px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .badge.s { background: var(--s-color); }
+  .badge.u { background: var(--u-color); }
+  .station-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .station-error {
+    font-size: 12px;
+    color: var(--warn);
+    padding: 2px 0 4px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 2px 0; font-size: 13px; vertical-align: baseline; }
+  td.line { width: 52px; }
+  td.line span {
+    display: inline-block;
+    min-width: 34px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #fff;
+    background: #444;
+  }
+  td.line span.suburban { background: var(--s-color); }
+  td.line span.subway { background: var(--u-color); }
+  td.dir {
+    color: var(--dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+  }
+  td.when { text-align: right; font-weight: 700; white-space: nowrap; }
+  td.when.soon { color: var(--warn); }
+  td.when .delay { font-weight: 400; font-size: 11px; color: var(--warn); margin-left: 3px; }
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 12px;
+    background: rgba(0,0,0,.25);
+    font-size: 10px;
+    color: var(--dim);
+  }
+</style>
+</head>
+<body>
+<div class="widget" id="widget">
+  <div class="station" id="station-s"></div>
+  <div class="station" id="station-u"></div>
+  <div class="footer">
+    <span id="status">loading…</span>
+    <span id="updated"></span>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Configuration via URL params:
+  //   ?s=900100003&u=900100003  (BVG IBNR stop ids)
+  //   &n=2  departures per direction
+  // Defaults: S+U Alexanderplatz for both.
+  var params = new URLSearchParams(location.search);
+  var STOPS = [
+    { key: "s", kind: "suburban", label: "S", el: document.getElementById("station-s"),
+      id: params.get("s") || "900100003" },
+    { key: "u", kind: "subway", label: "U", el: document.getElementById("station-u"),
+      id: params.get("u") || "900100003" }
+  ];
+  var PER_DIRECTION = parseInt(params.get("n") || "2", 10);
+  var API = "https://v6.bvg.transport.rest";
+  var REFRESH_MS = 30000;
+
+  function fetchJSON(url) {
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    });
+  }
+
+  function mins(iso) {
+    var d = new Date(iso);
+    var m = Math.round((d - Date.now()) / 60000);
+    return Math.max(0, m);
+  }
+
+  function fmt(dep) {
+    var m = mins(dep.when);
+    if (dep.when && mins(dep.when) === 0) return "now";
+    if (m < 60) return m + " min";
+    return new Date(dep.when).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " *";
+  }
+
+  function renderStation(cfg, data) {
+    var departures = (data.departures || []).filter(function (d) {
+      return d.line && d.line.product === cfg.kind;
+    });
+
+    // Group into directions by the line's terminus (direction field).
+    var seen = {}, dirs = [];
+    departures.forEach(function (d) {
+      var dir = (d.direction || d.destination && d.destination.name || "?").trim();
+      if (!seen[dir]) { seen[dir] = []; dirs.push(dir); }
+      if (seen[dir].length < PER_DIRECTION) seen[dir].push(d);
+    });
+
+    var rows = "";
+    dirs.slice(0, 2).forEach(function (dir) {
+      seen[dir].forEach(function (d) {
+        var m = mins(d.when);
+        var delay = "";
+        if (d.delay && d.delay > 0) delay = "+" + Math.round(d.delay / 60);
+        var cls = m <= 2 ? " soon" : "";
+        var lineName = (d.line.name || "").replace(/^(S|U)-?Bahn\s*/i, "");
+        rows += "<tr>" +
+          '<td class="line"><span class="' + cfg.kind + '">' + lineName + "</span></td>" +
+          '<td class="dir" title="' + escapeHtml(dir) + '">' + escapeHtml(dir) + "</td>" +
+          '<td class="when' + cls + '">' + fmt(d) +
+          '<span class="delay">' + delay + "</span></td>" +
+          "</tr>";
+      });
+    });
+
+    cfg.el.innerHTML =
+      '<div class="station-head">' +
+      '<span class="badge ' + cfg.key + '">' + cfg.label + "</span>" +
+      '<span class="station-name">' + escapeHtml(stationName(data, departures)) + "</span>" +
+      "</div>" +
+      (rows
+        ? "<table><tbody>" + rows + "</tbody></table>"
+        : '<div class="station-error">No departures found</div>');
+  }
+
+  function stationName(data, departures) {
+    var name = departures.length && departures[0].stop && departures[0].stop.name;
+    if (!name) name = data.stop && data.stop.name;
+    name = (name || "Station").replace(/\s*\(Berlin\)$/, "").replace(/ Bhf$/, "");
+    return name;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function setStatus(text, isErr) {
+    var el = document.getElementById("status");
+    el.textContent = text;
+    el.style.color = isErr ? "var(--warn)" : "";
+  }
+
+  function refresh() {
+    STOPS.forEach(function (cfg) {
+      fetchJSON(API + "/stops/" + encodeURIComponent(cfg.id) +
+        "/departures?results=20&" + cfg.kind + "=true")
+        .then(function (data) { renderStation(cfg, data); })
+        .catch(function (err) {
+          cfg.el.innerHTML =
+            '<div class="station-head"><span class="badge ' + cfg.key + '">' + cfg.label +
+            '</span><span class="station-name">—</span></div>' +
+            '<div class="station-error">API error: ' + escapeHtml(err.message) + "</div>";
+          setStatus("API error", true);
+        });
+    });
+    document.getElementById("updated").textContent =
+      new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setStatus("BVG live");
+  }
+
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+})();
+</script>
+</body>
+</html>
