@@ -1,4 +1,4 @@
-# BVG Departure Board — Icinga bottom-right widget (preview)
+# BVG Departure Board — Icinga bottom-left widget (preview)
 
 A small, dependency-free preview of the departure widget for the Icinga TV display.
 
@@ -7,11 +7,12 @@ A small, dependency-free preview of the departure widget for the Icinga TV displ
 ```
 departure-board/               ← repo root
 ├── 01_Project/                ← site code (what gets served/deployed)
-│   ├── index.html             — dark "Icinga-style" stand-in dashboard with the widget embedded via iframe, pinned to the bottom-right corner.
+│   ├── index.html             — dark "Icinga-style" stand-in dashboard with the widget embedded via iframe, pinned to the bottom-left corner.
 │   └── departures.html        — the actual widget: one S-Bahn station and one U-Bahn station, next departures for both directions each, live from the [BVG transport.rest API](https://v6.bvg.transport.rest/).
 ├── 02_Design/DESIGN.md        — Berlin S-Bahn/U-Bahn design and iconography reference.
 ├── 03_Screenshots/            — verified preview screenshots.
 ├── 04_Internal/server.py      — optional internal server: hosts the widget and caches API calls for shared use.
+├── 05_Integration/            — the real Icinga Web 2 integration: Tampermonkey userscript for the NUC's Chrome.
 └── docs/PROJECT_LOG.md        — project log (goal, status, session history).
 ```
 
@@ -126,11 +127,26 @@ Footprint per widget instance: about 6 API calls per minute (2 refreshes × 3 bl
 
 ## Embedding in the real Icinga page
 
-In your Icinga source, add the same fixed-position iframe pointing at the NUC folder's served URL (localhost is fine since the NUC's Chrome opens the Icinga page directly):
+The TV NUC runs Chrome against the real Icinga Web 2 page (`/icingaweb2/…`, businessprocess views with 1-second auto-refresh over AJAX). Two ways to add the widget — the userscript is the recommended one, since Icinga Web 2 has no per-page HTML hook and rewrites its containers on every auto-refresh.
+
+### Option A — Tampermonkey userscript (recommended for the NUC)
+
+Install the [Tampermonkey](https://www.tampermonkey.net/) extension in the NUC's Chrome, create a new script, and paste the contents of [`05_Integration/icinga-departures.user.js`](05_Integration/icinga-departures.user.js). Then set the `WIDGET_URL` constant inside to wherever the widget is served — for the NUC's local server the default `http://localhost:8000/departures.html` already fits; for the shared internal server use `http://<internal-host>:8000/departures.html?api=/api`. Any station/scale parameters (README: "Configuration") go into the same URL.
+
+What the userscript handles:
+
+- Pins the iframe to the **bottom-left** corner, above all Icinga content.
+- Only activates on `/icingaweb2/` pages in the top document window (no popups/modals).
+- Survives Icinga's AJAX auto-refresh: if anything removes or restyles the frame, it is re-attached to `<body>`.
+- Auto-fits the frame to the widget's reported size (`bvg-widget-size` postMessage) and force-reloads the iframe when the heartbeat stops for 3 minutes.
+
+### Option B — edit the Icinga layout directly
+
+If you can edit the server (e.g. a custom module or `public/` overlay), add the same fixed-position iframe plus the listener script to the page layout:
 
 ```html
-<iframe src="http://localhost:8000/departures.html"
-        style="position: fixed; right: 16px; bottom: 16px; width: 340px; height: 300px;
+<iframe id="bvg-widget" src="http://localhost:8000/departures.html"
+        style="position: fixed; left: 16px; bottom: 16px; width: 340px; height: 300px;
                border: 0; background: transparent;"
         scrolling="no"></iframe>
 ```
