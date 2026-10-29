@@ -87,9 +87,23 @@ In your Icinga source, add the same fixed-position iframe pointing at the NUC fo
         scrolling="no"></iframe>
 ```
 
-If you use a display scale `s` (setup panel or `?scale=`), size the iframe to match: `width = 340 × s`, `height = 300 × s` (e.g. scale 1.5 → 510 × 450). Set the size in the Icinga page source; the widget itself cannot resize its frame from inside.
+The widget reports its rendered size after every refresh via `postMessage` (type `bvg-widget-size`, with `width`/`height`). To make the iframe auto-fit (recommended — it also tracks the display scale and any station changes), add this listener to the parent page:
+
+```html
+<script>
+  window.addEventListener("message", function (e) {
+    if (e.data && e.data.type === "bvg-widget-size") {
+      var f = document.getElementById("bvg-widget");
+      f.style.width = e.data.width + "px";
+      f.style.height = e.data.height + "px";
+    }
+  });
+</script>
+```
+
+(give the iframe `id="bvg-widget"`). Alternatively size it manually: `width = 340 × scale`, with enough height for all three station blocks plus footer — roughly `320 × scale` with 2 departures per direction, more if you raise `n`.
 
 ## Notes
 
 - The widget sets `background: transparent` on `body` so it blends into the Icinga page; for a standalone look, give `.widget` your desired backdrop in `departures.html`.
-- Height ~300px fits two stations with 2 departures each. Adjust `n` and the iframe height if you change that.
+- Height ~300px fits two stations with 2 departures each; the full three-block widget (S, U, RE) needs roughly 320px at scale 1. Use the auto-fit listener or adjust the iframe height if you change `n` or `scale`.

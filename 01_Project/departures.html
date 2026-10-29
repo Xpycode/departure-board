@@ -396,6 +396,19 @@
   if (REGIONAL_STOPS.length > 1) {
     setInterval(function () { rIndex++; loadRegional(); }, ROTATE_MS);
   }
+
+  // Report the rendered size to the embedding page so the iframe can fit
+  // the content exactly (the widget cannot resize its own frame). Works
+  // cross-origin via postMessage; the parent decides whether to listen.
+  function notifySize() {
+    if (window.parent === window) return;
+    var doc = document.documentElement;
+    window.parent.postMessage(
+      { type: "bvg-widget-size", width: doc.scrollWidth, height: doc.scrollHeight }, "*");
+  }
+  new MutationObserver(notifySize).observe(document.getElementById("widget"),
+    { childList: true, subtree: true, characterData: true });
+  notifySize();
 })();
 </script>
 </body>
