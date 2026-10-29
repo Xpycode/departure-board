@@ -2,7 +2,7 @@
 
 ## Goal
 
-A small website that can be framed into the Icinga monitoring page (displayed on a TV via Chrome on a Windows NUC) to show the next departures of Berlin S-Bahn and U-Bahn stations in the bottom-left corner — at most one S-Bahn station and one U-Bahn station, for both directions each.
+A small website that can be framed into the Icinga monitoring page (displayed on a TV via Chrome on a Windows NUC) to show the next departures of Berlin S-Bahn and U-Bahn stations in the bottom-right corner — at most one S-Bahn station and one U-Bahn station, for both directions each.
 
 ## Status
 
@@ -16,7 +16,7 @@ Screenshot shows the Icinga stand-in dashboard with the widget pinned bottom-lef
 
 | File | Purpose |
 |------|---------|
-| `01_Project/index.html` | Dark Icinga-style stand-in dashboard (host/service cards, live clock) with the widget embedded as a fixed-position iframe, bottom-left. |
+| `01_Project/index.html` | Dark Icinga-style stand-in dashboard (host/service cards, live clock) with the widget embedded as a fixed-position iframe, bottom-right. |
 | `01_Project/departures.html` | The actual widget: one S-Bahn + one U-Bahn station, next departures for both directions (grouped by terminus), line badges, countdown, delay display (`+2` in orange). Auto-refresh every 30s. |
 | `02_Design/DESIGN.md` | Berlin S-Bahn/U-Bahn design and iconography reference. |
 | `03_Screenshots/docs-preview.png` | Verified screenshot of the running preview. |
@@ -41,7 +41,7 @@ Built-in setup panel (footer `setup` button, persisted in localStorage) or URL p
 - [x] Decide final stations — S Humboldthain, U Voltastraße, plus a regional block alternating Gesundbrunnen/Alexanderplatz (done, session 4).
 - [ ] Integrate the iframe snippet into the real Icinga page source (user will provide the source code later — session hand-off point, continue via CLI).
 - [ ] Verify rendering on the TV/NUC (Chrome on Windows) — especially readability at TV distance; may need a font-size scale config option.
-- [ ] Position moved to bottom-right (user correction in session 4) — update `index.html` stand-in accordingly when integrating.
+- [x] Position moved to bottom-right (user correction in session 4) — stand-in `index.html` and README snippet updated (done, session 8).
 - [ ] NUC deployment: the NUC gets its own folder with only `01_Project/departures.html` (self-contained single file), not a copy of this repo; serve via a local static server, config stays in the iframe URL.
 
 ## Session history
@@ -53,3 +53,4 @@ Built-in setup panel (footer `setup` button, persisted in localStorage) or URL p
 5. **2026-10-29 (session 5)** — Merged the two remote `vibe/*` branches (regional block, design reference) into `main` locally and pushed; BVG API endpoints re-verified live. Restructured the repo to the standard numbered folder layout: site code into `01_Project/`, design reference into `02_Design/`, screenshot into `03_Screenshots/`, this log into `docs/`; added `.gitignore`; README updated for the new paths.
 6. **2026-10-29 (session 6)** — Deployment decision: the NUC will get a standalone folder with only `departures.html` (verified self-contained: no local asset references, sole runtime dependency is the BVG API), not a copy of this repo. README gained a "Deploying to the NUC" section; config stays in the iframe URL so the file can be updated by overwrite.
 7. **2026-10-29 (session 7)** — Fixed station name resolution: `/stops?query=` returns only `type: "station"` entries with `de:11000:<IBNR>` ids, so the session-4 `resolveId` (looking for `type: "stop"`, passing raw ids) never resolved any name — all blocks showed API errors. Now accepts station results and extracts the bare IBNR; verified live for S Humboldthain (900008101) and U Voltastraße (900007103). Added a built-in setup panel (footer `setup` button) that saves station config to localStorage; precedence is URL params > saved config > defaults. Cancelled departures (null `when`) now fall back to `plannedWhen` instead of rendering "01:00 *". JS syntax-checked with `node --check`.
+8. **2026-10-29 (session 8)** — Widget position updated to bottom-right everywhere: stand-in `index.html` iframe, README embed snippet/heading, and this log's goal description. Remaining open items are the Icinga integration (needs the real page source) and TV/NUC verification.

@@ -1,4 +1,4 @@
-# BVG Departure Board — Icinga bottom-left widget (preview)
+# BVG Departure Board — Icinga bottom-right widget (preview)
 
 A small, dependency-free preview of the departure widget for the Icinga TV display.
 
@@ -7,7 +7,7 @@ A small, dependency-free preview of the departure widget for the Icinga TV displ
 ```
 departure-board/               ← repo root
 ├── 01_Project/                ← site code (what gets served/deployed)
-│   ├── index.html             — dark "Icinga-style" stand-in dashboard with the widget embedded via iframe, pinned to the bottom-left corner.
+│   ├── index.html             — dark "Icinga-style" stand-in dashboard with the widget embedded via iframe, pinned to the bottom-right corner.
 │   └── departures.html        — the actual widget: one S-Bahn station and one U-Bahn station, next departures for both directions each, live from the [BVG transport.rest API](https://v6.bvg.transport.rest/).
 ├── 02_Design/DESIGN.md        — Berlin S-Bahn/U-Bahn design and iconography reference.
 ├── 03_Screenshots/            — verified preview screenshots.
@@ -81,7 +81,7 @@ In your Icinga source, add the same fixed-position iframe pointing at the NUC fo
 
 ```html
 <iframe src="http://localhost:8000/departures.html"
-        style="position: fixed; left: 16px; bottom: 16px; width: 340px; height: 300px;
+        style="position: fixed; right: 16px; bottom: 16px; width: 340px; height: 300px;
                border: 0; background: transparent;"
         scrolling="no"></iframe>
 ```
