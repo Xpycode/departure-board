@@ -64,7 +64,7 @@ departures.
 - Shows minutes until departure (`now`, `3 min`, ...); absolute time with `*` if more than 60 minutes out.
 - Shows delay as `+2` in orange next to the time.
 - Departures are grouped per direction (terminus) — up to 2 directions, e.g. eastbound + westbound.
-- Info line: disruption warnings of the displayed trains (API "warning" remarks, e.g. line cancellations or construction replacements) scroll in a yellow line above the footer, like real station boards; the line is hidden when there are none. Click the line to cycle its scroll speed (1x → 2x → 4x); its text size is the `ts` setting.
+- Info line: disruption warnings of the displayed trains (API "warning" remarks, e.g. line cancellations or construction replacements) rotate one at a time in a yellow line above the footer, with a position counter. Click the counter to jump to the next message, click the text to cycle scroll speed (1x → 2x → 4x); a completed scroll pass auto-advances. Hidden when there are none. HTML in remark texts (some are bare links) is flattened to `label: URL`. Text size is the `ts` setting.
 
 ## Deploying to the NUC
 

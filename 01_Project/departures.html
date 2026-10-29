@@ -102,18 +102,30 @@
   td.when.soon { color: var(--warn); }
   td.when .delay { font-weight: 400; font-size: calc(11px * var(--scale)); color: var(--warn); margin-left: calc(3px * var(--scale)); }
   .ticker {
+    display: flex;
+    align-items: stretch;
     overflow: hidden;
     border-top: 1px solid var(--border);
     background: rgba(0,0,0,.25);
     font-size: calc(var(--ts) * var(--scale));
     color: var(--warn);
-    cursor: pointer;
   }
+  .ticker .text { flex: 1; overflow: hidden; white-space: nowrap; cursor: pointer; }
   .ticker .scroll {
     display: inline-block;
     white-space: nowrap;
     padding: calc(3px * var(--scale)) 0 calc(3px * var(--scale)) 100%;
     animation: ticker-scroll linear infinite;
+  }
+  .ticker .count {
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding: 0 calc(6px * var(--scale));
+    border-left: 1px solid var(--border);
+    color: var(--dim);
+    cursor: pointer;
+    user-select: none;
   }
   @keyframes ticker-scroll {
     from { transform: translateX(0); }
@@ -332,12 +344,13 @@
     var departures = usableDepartures(cfg, data);
 
     // Collect system-wide disruption messages ("warning" remarks) of the
-    // displayed trains for the scrolling info line.
+    // displayed trains for the info line; flatten HTML in the texts.
     cfg.warnings = [];
     departures.forEach(function (d) {
       (d.remarks || []).forEach(function (r) {
-        if (r.type === "warning" && r.text && cfg.warnings.indexOf(r.text) === -1) {
-          cfg.warnings.push(r.text);
+        if (r.type === "warning" && r.text) {
+          var w = stripHtml(r.text);
+          if (w && cfg.warnings.indexOf(w) === -1) cfg.warnings.push(w);
         }
       });
     });
@@ -384,19 +397,54 @@
     updateTicker();
   }
 
-  // Scrolling info line, like real station boards: shows the union of the
-  // disruption warnings ("warning" remarks) of all displayed trains. Hidden
-  // when there are none. Scroll duration adapts to the message length;
-  // clicking the line cycles the scroll speed (1x -> 2x -> 4x).
+  // Info line, like real station boards: shows the disruption warnings
+  // ("warning" remarks) of all displayed trains, one message at a time.
+  // The counter ("2/5") jumps to the next message on click, clicking the
+  // text cycles the scroll speed (1x -> 2x -> 4x), and a completed scroll
+  // pass auto-advances to the next message. The DOM is only rebuilt when
+  // the message list changes, so routine refreshes and RE station switches
+  // do not restart the running scroll.
+  var tickerMsgs = [];
+  var tickerIdx = 0;
   var tickerSpeed = 1;
   var tickerBaseSec = 15;
+
   function setTickerDuration() {
-    tickerEl.firstChild.style.animationDuration =
-      Math.max(4, Math.round(tickerBaseSec / tickerSpeed)) + "s";
+    var scroll = tickerEl.querySelector(".scroll");
+    if (scroll) {
+      scroll.style.animationDuration =
+        Math.max(4, Math.round(tickerBaseSec / tickerSpeed)) + "s";
+    }
   }
-  tickerEl.addEventListener("click", function () {
-    tickerSpeed = tickerSpeed === 1 ? 2 : tickerSpeed === 2 ? 4 : 1;
-    if (tickerEl.firstChild) setTickerDuration();
+
+  function renderTickerMsg() {
+    if (!tickerMsgs.length) return;
+    var text = tickerMsgs[tickerIdx];
+    tickerBaseSec = Math.max(15, Math.round(text.length * 0.4));
+    tickerEl.style.display = "flex";
+    tickerEl.innerHTML =
+      '<span class="text"><span class="scroll">' + escapeHtml(text) + "</span></span>" +
+      '<span class="count" title="Next message">' +
+      (tickerIdx + 1) + "/" + tickerMsgs.length + "</span>";
+    setTickerDuration();
+    tickerEl.querySelector(".scroll").addEventListener("animationiteration", function () {
+      showTickerMsg(tickerIdx + 1);
+    });
+  }
+
+  function showTickerMsg(i) {
+    if (!tickerMsgs.length) return;
+    tickerIdx = (i + tickerMsgs.length) % tickerMsgs.length;
+    renderTickerMsg();
+  }
+
+  tickerEl.addEventListener("click", function (e) {
+    if (e.target.classList.contains("count")) {
+      showTickerMsg(tickerIdx + 1);
+    } else {
+      tickerSpeed = tickerSpeed === 1 ? 2 : tickerSpeed === 2 ? 4 : 1;
+      setTickerDuration();
+    }
   });
 
   function updateTicker() {
@@ -406,16 +454,18 @@
         if (!seen[w]) { seen[w] = true; msgs.push(w); }
       });
     });
+    var joined = msgs.join("\u0000");
+    if (joined === tickerMsgs.join("\u0000")) return;
+    var current = tickerMsgs[tickerIdx];
+    tickerMsgs = msgs;
     if (!msgs.length) {
       tickerEl.style.display = "none";
       tickerEl.innerHTML = "";
       return;
     }
-    var text = msgs.join("  +++  ");
-    tickerBaseSec = Math.max(15, Math.round(text.length * 0.4));
-    tickerEl.style.display = "block";
-    tickerEl.innerHTML = '<div class="scroll">' + escapeHtml(text) + "</div>";
-    setTickerDuration();
+    if (current && msgs.indexOf(current) !== -1) tickerIdx = msgs.indexOf(current);
+    else if (tickerIdx >= msgs.length) tickerIdx = 0;
+    renderTickerMsg();
   }
 
   function stationName(data, departures, cfg) {
@@ -430,6 +480,17 @@
     return String(s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
+  }
+
+  // API remark texts may contain HTML (some warnings are a bare link
+  // element); flatten anchors to "label: URL" and strip any other tags.
+  function stripHtml(s) {
+    return String(s)
+      .replace(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi,
+        function (m, url, label) { return label.trim() + ": " + url; })
+      .replace(/<[^>]*>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   function setStatus(text, isErr) {
