@@ -8,7 +8,7 @@ A small website that can be framed into the Icinga monitoring page (displayed on
 
 **Preview complete and verified on local Mac** (2026-10-29):
 
-![Preview running with live BVG data](docs-preview.png)
+![Preview running with live BVG data](../03_Screenshots/docs-preview.png)
 
 Screenshot shows the Icinga stand-in dashboard with the widget pinned bottom-left, rendering real departures for S+U Alexanderplatz (S9, S3, U2, with "now"/"1 min"/"3 min" countdowns and delays).
 
@@ -16,10 +16,11 @@ Screenshot shows the Icinga stand-in dashboard with the widget pinned bottom-lef
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Dark Icinga-style stand-in dashboard (host/service cards, live clock) with the widget embedded as a fixed-position iframe, bottom-left. |
-| `departures.html` | The actual widget: one S-Bahn + one U-Bahn station, next departures for both directions (grouped by terminus), line badges, countdown, delay display (`+2` in orange). Auto-refresh every 30s. |
+| `01_Project/index.html` | Dark Icinga-style stand-in dashboard (host/service cards, live clock) with the widget embedded as a fixed-position iframe, bottom-left. |
+| `01_Project/departures.html` | The actual widget: one S-Bahn + one U-Bahn station, next departures for both directions (grouped by terminus), line badges, countdown, delay display (`+2` in orange). Auto-refresh every 30s. |
+| `02_Design/DESIGN.md` | Berlin S-Bahn/U-Bahn design and iconography reference. |
+| `03_Screenshots/docs-preview.png` | Verified screenshot of the running preview. |
 | `README.md` | Run instructions, configuration reference, and the iframe embed snippet for the real Icinga page. |
-| `docs-preview.png` | Verified screenshot of the running preview. |
 
 ## Technical decisions
 
@@ -48,3 +49,4 @@ URL params on `departures.html`: `?s={S-Bahn stop IBNR}&u={U-Bahn stop IBNR}&n={
 2. **2026-10-29 (session 2)** — User created private repo `Xpycode/departure-board` via `gh repo create`; pushed initial commit `805ee85` to `main` with the three files. User confirmed the preview runs locally with live data (screenshot provided → `docs-preview.png`).
 3. **2026-10-29 (session 3)** — Added this log (`PROJECT_LOG.md`) and the verified screenshot.
 4. **2026-10-29 (session 4)** — New station defaults (S Humboldthain, U Voltastraße); added third "RE" block for regional trains cycling between S+U Gesundbrunnen and S+U Alexanderplatz every 20s (Stadtbahn RE construction); stop params now accept names or IBNRs (auto-resolved via `/stops?query=`); user clarified widget position is bottom-right. JS syntax-checked with `node --check`.
+5. **2026-10-29 (session 5)** — Merged the two remote `vibe/*` branches (regional block, design reference) into `main` locally and pushed; BVG API endpoints re-verified live. Restructured the repo to the standard numbered folder layout: site code into `01_Project/`, design reference into `02_Design/`, screenshot into `03_Screenshots/`, this log into `docs/`; added `.gitignore`; README updated for the new paths.

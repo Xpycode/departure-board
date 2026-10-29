@@ -4,23 +4,30 @@ A small, dependency-free preview of the departure widget for the Icinga TV displ
 
 ## Files
 
-- `index.html` — dark "Icinga-style" stand-in dashboard with the widget embedded via iframe, pinned to the bottom-left corner.
-- `departures.html` — the actual widget: one S-Bahn station and one U-Bahn station, next departures for both directions each, live from the [BVG transport.rest API](https://v6.bvg.transport.rest/).
+```
+departure-board/               ← repo root
+├── 01_Project/                ← site code (what gets served/deployed)
+│   ├── index.html             — dark "Icinga-style" stand-in dashboard with the widget embedded via iframe, pinned to the bottom-left corner.
+│   └── departures.html        — the actual widget: one S-Bahn station and one U-Bahn station, next departures for both directions each, live from the [BVG transport.rest API](https://v6.bvg.transport.rest/).
+├── 02_Design/DESIGN.md        — Berlin S-Bahn/U-Bahn design and iconography reference.
+├── 03_Screenshots/            — verified preview screenshots.
+└── docs/PROJECT_LOG.md        — project log (goal, status, session history).
+```
 
 ## Run locally (Mac)
 
 ```bash
 cd departure-board
-python3 -m http.server 8000
+python3 -m http.server 8000 --directory 01_Project
 ```
 
 Then open http://localhost:8000/
 
-(The API is CORS-enabled, so double-clicking `index.html` also works — no server needed.)
+(The API is CORS-enabled, so double-clicking `01_Project/index.html` also works — no server needed.)
 
 ## Configuration
 
-URL parameters on `departures.html` (or on the iframe `src` in `index.html`).
+URL parameters on `departures.html` (or on the iframe `src` in `index.html`, both in `01_Project/`).
 Values may be BVG IBNR stop ids (digits) or plain station names — names are
 resolved automatically via `/stops?query=`.
 
