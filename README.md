@@ -37,7 +37,9 @@ Values may be BVG IBNR stop ids (digits) or plain station names — names are re
 | Param | Meaning | Default |
 |-------|---------|---------|
 | `s`   | S-Bahn stop (id or name) | `S Humboldthain` |
+| `sl`  | S lead time (min walk — hides trains leaving sooner) | `8` |
 | `u`   | U-Bahn stop (id or name) | `U Voltastraße` |
+| `ul`  | U lead time (min walk — hides trains leaving sooner) | `12` |
 | `r`   | Regional stops to cycle through (comma-separated) | `S+U Gesundbrunnen,S+U Alexanderplatz` |
 | `rl`  | RE lead time in minutes (one per station, comma-sep.) — hides trains leaving sooner than the walk to that station | `10` |
 | `rf`  | Only these RE lines (comma-separated, substring match, empty = all) | — |
