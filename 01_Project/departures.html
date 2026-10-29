@@ -122,12 +122,9 @@
   .cfg-btn:hover { color: var(--text); }
   .cfg-panel {
     display: none;
-    position: absolute;
-    inset: 0;
-    z-index: 10;
     padding: calc(10px * var(--scale)) calc(12px * var(--scale));
     background: var(--panel);
-    overflow-y: auto;
+    border-top: 1px solid var(--border);
   }
   .cfg-panel.open { display: block; }
   .cfg-panel label {
@@ -183,6 +180,10 @@
     <input id="cfg-u" placeholder="U Voltastraße">
     <label for="cfg-r">Regional stations (comma-sep., cycled every 20 s)</label>
     <input id="cfg-r" placeholder="S+U Gesundbrunnen,S+U Alexanderplatz">
+    <label for="cfg-rl">RE lead time (min, one per station, comma-sep.) — hides trains leaving sooner than the walk there</label>
+    <input id="cfg-rl" placeholder="10  or  10,20">
+    <label for="cfg-rf">Only these RE lines (comma-sep., empty = all, e.g. RE,ICE)</label>
+    <input id="cfg-rf" placeholder="RE,ICE">
     <label for="cfg-n">Departures per direction</label>
     <input id="cfg-n" type="number" min="1" max="4" value="2">
     <label for="cfg-scale">Display scale (0.8–2, resize the iframe to match)</label>
@@ -219,6 +220,15 @@
   ];
   var REGIONAL_STOPS = String(cfgValue("r", "S+U Gesundbrunnen,S+U Alexanderplatz"))
     .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+  // Lead time per RE station (minutes): departures sooner than the walk
+  // to that station are hidden. One value applies to all; a comma list
+  // aligns with the r stops.
+  var REGIONAL_LEADS = String(cfgValue("rl", "10")).split(",")
+    .map(function (s) { return parseInt(s.trim(), 10); })
+    .filter(function (v) { return !isNaN(v) && v >= 0; });
+  // Optional RE line filter (comma-separated, substring match, e.g. RE,ICE).
+  var REGIONAL_LINES = String(cfgValue("rf", "")).split(",")
+    .map(function (s) { return s.trim().toUpperCase(); }).filter(Boolean);
   var PER_DIRECTION = parseInt(cfgValue("n", "2"), 10);
   var SCALE = Math.min(2, Math.max(0.8, parseFloat(cfgValue("scale", "1")) || 1));
   document.documentElement.style.setProperty("--scale", String(SCALE));
@@ -233,7 +243,8 @@
   // no regionalExp/national params on this instance.)
   var PRODUCTS = ["suburban", "subway", "tram", "bus", "ferry", "express", "regional"];
   var R_PRODUCTS = ["regional", "express"];
-  var regionalCfg = { key: "r", label: "RE", el: document.getElementById("station-r") };
+  var regionalCfg = { key: "r", label: "RE", el: document.getElementById("station-r"),
+    lineFilter: REGIONAL_LINES.length ? REGIONAL_LINES : null };
   var idCache = {};
 
   function fetchJSON(url) {
@@ -263,12 +274,29 @@
     return new Date(dep.when || dep.plannedWhen).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " *";
   }
 
-  function renderStation(cfg, data) {
-    var departures = (data.departures || []).filter(function (d) {
+  // Departures to display for a block: right product, not leaving sooner
+  // than the lead time, and matching the optional line filter.
+  function usableDepartures(cfg, data) {
+    var lead = cfg.minLead || 0;
+    var lineFilter = cfg.lineFilter || null;
+    return (data.departures || []).filter(function (d) {
       if (!d.line) return false;
-      return cfg.kind ? d.line.product === cfg.kind
+      var keep = cfg.kind ? d.line.product === cfg.kind
         : R_PRODUCTS.indexOf(d.line.product) !== -1;
+      if (!keep) return false;
+      // Skip trains leaving sooner than the lead time (walk to the station).
+      if (lead > 0 && mins(d) < lead) return false;
+      // Optional substring line filter, e.g. "RE" matches RE5, "ICE 838".
+      if (lineFilter) {
+        var name = String(d.line.name || "").toUpperCase();
+        return lineFilter.some(function (f) { return name.indexOf(f) !== -1; });
+      }
+      return true;
     });
+  }
+
+  function renderStation(cfg, data) {
+    var departures = usableDepartures(cfg, data);
 
     // Group into directions by the line's terminus (direction field).
     var seen = {}, dirs = [];
@@ -371,9 +399,12 @@
   }
 
   function hasRegionalDepartures(data) {
-    return (data.departures || []).some(function (d) {
-      return d.line && R_PRODUCTS.indexOf(d.line.product) !== -1;
-    });
+    return usableDepartures(regionalCfg, data).length > 0;
+  }
+
+  function regionalLead(idx) {
+    if (!REGIONAL_LEADS.length) return 0;
+    return REGIONAL_LEADS[Math.min(idx, REGIONAL_LEADS.length - 1)];
   }
 
   // Loads the current RE cycling station. Regional trains run every 20-30+
@@ -383,7 +414,9 @@
   function loadRegional(attempt) {
     if (!REGIONAL_STOPS.length) return;
     attempt = attempt || 0;
-    loadDepartures(regionalCfg, REGIONAL_STOPS[rIndex % REGIONAL_STOPS.length],
+    var idx = rIndex % REGIONAL_STOPS.length;
+    regionalCfg.minLead = regionalLead(idx);
+    loadDepartures(regionalCfg, REGIONAL_STOPS[idx],
       "results=20&duration=90&" + productsQuery(R_PRODUCTS))
       .then(function (data) {
         if (!hasRegionalDepartures(data) && REGIONAL_STOPS.length > 1 &&
@@ -411,12 +444,16 @@
     document.getElementById("cfg-s").value = STOPS[0].stop;
     document.getElementById("cfg-u").value = STOPS[1].stop;
     document.getElementById("cfg-r").value = REGIONAL_STOPS.join(",");
+    document.getElementById("cfg-rl").value = REGIONAL_LEADS.join(",");
+    document.getElementById("cfg-rf").value = REGIONAL_LINES.join(",");
     document.getElementById("cfg-n").value = PER_DIRECTION;
     document.getElementById("cfg-scale").value = SCALE;
     cfgPanel.classList.add("open");
+    notifySize();
   });
   document.getElementById("cfg-cancel").addEventListener("click", function () {
     cfgPanel.classList.remove("open");
+    notifySize();
   });
   document.getElementById("cfg-reset").addEventListener("click", function () {
     localStorage.removeItem("bvg-widget-config");
@@ -429,6 +466,8 @@
       s: document.getElementById("cfg-s").value.trim(),
       u: document.getElementById("cfg-u").value.trim(),
       r: document.getElementById("cfg-r").value.trim(),
+      rl: document.getElementById("cfg-rl").value.trim(),
+      rf: document.getElementById("cfg-rf").value.trim(),
       n: isNaN(n) ? 2 : n,
       scale: isNaN(scale) ? 1 : Math.min(2, Math.max(0.8, scale))
     }));

@@ -39,6 +39,8 @@ Values may be BVG IBNR stop ids (digits) or plain station names — names are re
 | `s`   | S-Bahn stop (id or name) | `S Humboldthain` |
 | `u`   | U-Bahn stop (id or name) | `U Voltastraße` |
 | `r`   | Regional stops to cycle through (comma-separated) | `S+U Gesundbrunnen,S+U Alexanderplatz` |
+| `rl`  | RE lead time in minutes (one per station, comma-sep.) — hides trains leaving sooner than the walk to that station | `10` |
+| `rf`  | Only these RE lines (comma-separated, substring match, empty = all) | — |
 | `n`   | Departures per direction  | `2` |
 | `scale` | Display scale (0.8–2) — makes everything in the widget proportionally larger/smaller | `1` |
 
