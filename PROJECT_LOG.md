@@ -37,12 +37,14 @@ URL params on `departures.html`: `?s={S-Bahn stop IBNR}&u={U-Bahn stop IBNR}&n={
 
 ## Open items
 
+- [x] Decide final stations — S Humboldthain, U Voltastraße, plus a regional block alternating Gesundbrunnen/Alexanderplatz (done, session 4).
 - [ ] Integrate the iframe snippet into the real Icinga page source (user will provide the source code later — session hand-off point, continue via CLI).
-- [ ] Decide final stations (currently defaulting to S+U Alexanderplatz for both S and U).
 - [ ] Verify rendering on the TV/NUC (Chrome on Windows) — especially readability at TV distance; may need a font-size scale config option.
+- [ ] Position moved to bottom-right (user correction in session 4) — update `index.html` stand-in accordingly when integrating.
 
 ## Session history
 
 1. **2026-10-29 (session 1)** — Built the preview (`index.html`, `departures.html`, `README.md`) against the live BVG API; verified API response shape via `v6.bvg.transport.rest`; JS syntax-checked with `node --check`. Repo did not exist yet.
 2. **2026-10-29 (session 2)** — User created private repo `Xpycode/departure-board` via `gh repo create`; pushed initial commit `805ee85` to `main` with the three files. User confirmed the preview runs locally with live data (screenshot provided → `docs-preview.png`).
 3. **2026-10-29 (session 3)** — Added this log (`PROJECT_LOG.md`) and the verified screenshot.
+4. **2026-10-29 (session 4)** — New station defaults (S Humboldthain, U Voltastraße); added third "RE" block for regional trains cycling between S+U Gesundbrunnen and S+U Alexanderplatz every 20s (Stadtbahn RE construction); stop params now accept names or IBNRs (auto-resolved via `/stops?query=`); user clarified widget position is bottom-right. JS syntax-checked with `node --check`.

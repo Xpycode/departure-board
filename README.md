@@ -20,17 +20,23 @@ Then open http://localhost:8000/
 
 ## Configuration
 
-URL parameters on `departures.html` (or on the iframe `src` in `index.html`):
+URL parameters on `departures.html` (or on the iframe `src` in `index.html`).
+Values may be BVG IBNR stop ids (digits) or plain station names — names are
+resolved automatically via `/stops?query=`.
 
 | Param | Meaning | Default |
 |-------|---------|---------|
-| `s`   | S-Bahn stop id (BVG IBNR) | `900100003` (S+U Alexanderplatz) |
-| `u`   | U-Bahn stop id (BVG IBNR) | `900100003` (S+U Alexanderplatz) |
+| `s`   | S-Bahn stop (id or name) | `S Humboldthain` |
+| `u`   | U-Bahn stop (id or name) | `U Voltastraße` |
+| `r`   | Regional stops to cycle through (comma-separated) | `S+U Gesundbrunnen,S+U Alexanderplatz` |
 | `n`   | Departures per direction  | `2` |
 
 Example: `departures.html?s=900100003&u=900100053&n=3`
 
-Find stop ids at `https://v6.bvg.transport.rest/stops?query=<name>` (e.g. `900100053` = U Gesundbrunnen... check the query result).
+The third block (red `RE` badge) shows regional trains (RE/RB/IC/ICE) and
+alternates between the configured `r` stops every 20 seconds — useful while
+the Stadtbahn regional platforms (Alexanderplatz) are under construction
+and traffic shifts to Gesundbrunnen.
 
 ## Behavior
 

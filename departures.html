@@ -13,6 +13,7 @@
     --dim: #8ea0b5;
     --s-color: #008d4b;
     --u-color: #005a94;
+    --r-color: #b03030;
     --warn: #ffb347;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,6 +50,7 @@
   }
   .badge.s { background: var(--s-color); }
   .badge.u { background: var(--u-color); }
+  .badge.r { background: var(--r-color); }
   .station-name {
     font-size: 13px;
     font-weight: 600;
@@ -78,6 +80,7 @@
   }
   td.line span.suburban { background: var(--s-color); }
   td.line span.subway { background: var(--u-color); }
+  td.line span.regional { background: var(--r-color); }
   td.dir {
     color: var(--dim);
     white-space: nowrap;
@@ -102,6 +105,7 @@
 <div class="widget" id="widget">
   <div class="station" id="station-s"></div>
   <div class="station" id="station-u"></div>
+  <div class="station" id="station-r"></div>
   <div class="footer">
     <span id="status">loading…</span>
     <span id="updated"></span>
@@ -113,19 +117,30 @@
   "use strict";
 
   // Configuration via URL params:
-  //   ?s=900100003&u=900100003  (BVG IBNR stop ids)
+  //   ?s=S Humboldthain&u=U Voltastraße  (names, or BVG IBNR stop ids like 900100003)
+  //   &r=S+U Gesundbrunnen,S+U Alexanderplatz  regional stops to cycle through
   //   &n=2  departures per direction
-  // Defaults: S+U Alexanderplatz for both.
+  // Defaults: S Humboldthain, U Voltastraße; regional block cycles
+  // Gesundbrunnen and Alexanderplatz (Stadtbahn RE construction detour).
+  // Values may be IBNRs (digits) or station names; names are resolved
+  // automatically via the /stops?query= endpoint.
   var params = new URLSearchParams(location.search);
   var STOPS = [
     { key: "s", kind: "suburban", label: "S", el: document.getElementById("station-s"),
-      id: params.get("s") || "900100003" },
+      stop: params.get("s") || "S Humboldthain" },
     { key: "u", kind: "subway", label: "U", el: document.getElementById("station-u"),
-      id: params.get("u") || "900100003" }
+      stop: params.get("u") || "U Voltastraße" }
   ];
+  var REGIONAL_STOPS = (params.get("r") || "S+U Gesundbrunnen,S+U Alexanderplatz")
+    .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
   var PER_DIRECTION = parseInt(params.get("n") || "2", 10);
   var API = "https://v6.bvg.transport.rest";
   var REFRESH_MS = 30000;
+  var ROTATE_MS = 20000;
+  var rIndex = 0;
+  var R_PRODUCTS = ["regional", "regionalExp", "express", "national"];
+  var regionalCfg = { key: "r", label: "RE", el: document.getElementById("station-r") };
+  var idCache = {};
 
   function fetchJSON(url) {
     return fetch(url).then(function (res) {
@@ -149,7 +164,9 @@
 
   function renderStation(cfg, data) {
     var departures = (data.departures || []).filter(function (d) {
-      return d.line && d.line.product === cfg.kind;
+      if (!d.line) return false;
+      return cfg.kind ? d.line.product === cfg.kind
+        : R_PRODUCTS.indexOf(d.line.product) !== -1;
     });
 
     // Group into directions by the line's terminus (direction field).
@@ -168,8 +185,9 @@
         if (d.delay && d.delay > 0) delay = "+" + Math.round(d.delay / 60);
         var cls = m <= 2 ? " soon" : "";
         var lineName = (d.line.name || "").replace(/^(S|U)-?Bahn\s*/i, "");
+        var lineCls = cfg.kind || "regional";
         rows += "<tr>" +
-          '<td class="line"><span class="' + cfg.kind + '">' + lineName + "</span></td>" +
+          '<td class="line"><span class="' + lineCls + '">' + lineName + "</span></td>" +
           '<td class="dir" title="' + escapeHtml(dir) + '">' + escapeHtml(dir) + "</td>" +
           '<td class="when' + cls + '">' + fmt(d) +
           '<span class="delay">' + delay + "</span></td>" +
@@ -206,19 +224,47 @@
     el.style.color = isErr ? "var(--warn)" : "";
   }
 
+  function resolveId(stop) {
+    if (/^\d{6,}$/.test(stop)) return Promise.resolve(stop);
+    if (idCache[stop]) return Promise.resolve(idCache[stop]);
+    return fetchJSON(API + "/stops?query=" + encodeURIComponent(stop) + "&results=5")
+      .then(function (stops) {
+        for (var i = 0; i < stops.length; i++) {
+          if (stops[i].type === "stop") {
+            idCache[stop] = stops[i].id;
+            return stops[i].id;
+          }
+        }
+        throw new Error("stop not found: " + stop);
+      });
+  }
+
+  function loadDepartures(cfg, stop, query) {
+    resolveId(stop)
+      .then(function (id) {
+        return fetchJSON(API + "/stops/" + encodeURIComponent(id) + "/departures?" + query);
+      })
+      .then(function (data) { renderStation(cfg, data); })
+      .catch(function (err) {
+        cfg.el.innerHTML =
+          '<div class="station-head"><span class="badge ' + cfg.key + '">' + cfg.label +
+          '</span><span class="station-name">—</span></div>' +
+          '<div class="station-error">API error: ' + escapeHtml(err.message) + "</div>";
+        setStatus("API error", true);
+      });
+  }
+
+  function loadRegional() {
+    if (!REGIONAL_STOPS.length) return;
+    loadDepartures(regionalCfg, REGIONAL_STOPS[rIndex % REGIONAL_STOPS.length],
+      "results=20&regional=true®ionalExp=true&express=true&national=true");
+  }
+
   function refresh() {
     STOPS.forEach(function (cfg) {
-      fetchJSON(API + "/stops/" + encodeURIComponent(cfg.id) +
-        "/departures?results=20&" + cfg.kind + "=true")
-        .then(function (data) { renderStation(cfg, data); })
-        .catch(function (err) {
-          cfg.el.innerHTML =
-            '<div class="station-head"><span class="badge ' + cfg.key + '">' + cfg.label +
-            '</span><span class="station-name">—</span></div>' +
-            '<div class="station-error">API error: ' + escapeHtml(err.message) + "</div>";
-          setStatus("API error", true);
-        });
+      loadDepartures(cfg, cfg.stop, "results=20&" + cfg.kind + "=true");
     });
+    loadRegional();
     document.getElementById("updated").textContent =
       new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     setStatus("BVG live");
@@ -226,6 +272,9 @@
 
   refresh();
   setInterval(refresh, REFRESH_MS);
+  if (REGIONAL_STOPS.length > 1) {
+    setInterval(function () { rIndex++; loadRegional(); }, ROTATE_MS);
+  }
 })();
 </script>
 </body>
