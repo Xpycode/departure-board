@@ -53,9 +53,9 @@ The third block (red `RE` badge) shows regional trains (RE/RB/IC/ICE) and
 alternates between the configured `r` stops every 20 seconds — useful while
 the Stadtbahn regional platforms (Alexanderplatz) are under construction
 and traffic shifts to Gesundbrunnen. A countdown in the RE header shows the
-next station and the seconds until the switch. A cycling station with no
-regional departures is skipped immediately in favor of the next one with
-departures.
+next station and the seconds until the switch; it hides while only one
+station has departures. A cycling station with no catchable departures is
+benched for 10 minutes and retried automatically afterwards.
 
 ## Behavior
 
