@@ -34,7 +34,7 @@ Screenshot shows the Icinga stand-in dashboard with the widget pinned bottom-lef
 
 ## Configuration
 
-URL params on `departures.html`: `?s={S-Bahn stop IBNR}&u={U-Bahn stop IBNR}&n={departures per direction}`. Defaults: Alexanderplatz for both, n=2.
+Built-in setup panel (footer `setup` button, persisted in localStorage) or URL params on `departures.html`: `?s={S stop}&u={U stop}&r={regional stops, comma-sep.}&n={departures per direction}`. Values are station names or IBNRs. Defaults: S Humboldthain, U Voltastraße, RE block cycling S+U Gesundbrunnen/S+U Alexanderplatz, n=2. URL params override the saved panel config.
 
 ## Open items
 
@@ -52,3 +52,4 @@ URL params on `departures.html`: `?s={S-Bahn stop IBNR}&u={U-Bahn stop IBNR}&n={
 4. **2026-10-29 (session 4)** — New station defaults (S Humboldthain, U Voltastraße); added third "RE" block for regional trains cycling between S+U Gesundbrunnen and S+U Alexanderplatz every 20s (Stadtbahn RE construction); stop params now accept names or IBNRs (auto-resolved via `/stops?query=`); user clarified widget position is bottom-right. JS syntax-checked with `node --check`.
 5. **2026-10-29 (session 5)** — Merged the two remote `vibe/*` branches (regional block, design reference) into `main` locally and pushed; BVG API endpoints re-verified live. Restructured the repo to the standard numbered folder layout: site code into `01_Project/`, design reference into `02_Design/`, screenshot into `03_Screenshots/`, this log into `docs/`; added `.gitignore`; README updated for the new paths.
 6. **2026-10-29 (session 6)** — Deployment decision: the NUC will get a standalone folder with only `departures.html` (verified self-contained: no local asset references, sole runtime dependency is the BVG API), not a copy of this repo. README gained a "Deploying to the NUC" section; config stays in the iframe URL so the file can be updated by overwrite.
+7. **2026-10-29 (session 7)** — Fixed station name resolution: `/stops?query=` returns only `type: "station"` entries with `de:11000:<IBNR>` ids, so the session-4 `resolveId` (looking for `type: "stop"`, passing raw ids) never resolved any name — all blocks showed API errors. Now accepts station results and extracts the bare IBNR; verified live for S Humboldthain (900008101) and U Voltastraße (900007103). Added a built-in setup panel (footer `setup` button) that saves station config to localStorage; precedence is URL params > saved config > defaults. Cancelled departures (null `when`) now fall back to `plannedWhen` instead of rendering "01:00 *". JS syntax-checked with `node --check`.

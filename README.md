@@ -27,9 +27,12 @@ Then open http://localhost:8000/
 
 ## Configuration
 
-URL parameters on `departures.html` (or on the iframe `src` in `index.html`, both in `01_Project/`).
-Values may be BVG IBNR stop ids (digits) or plain station names — names are
-resolved automatically via `/stops?query=`.
+Two ways to configure — no file editing needed either way:
+
+1. **Built-in setup panel**: click the `setup` button in the widget footer, pick stations, Save. Stored in the browser's localStorage (per browser/per device), so on the NUC you configure once and it persists across reboots. Reset returns to defaults.
+2. **URL parameters** on `departures.html` (or the iframe `src` in `index.html`) — these override the saved panel config when present.
+
+Values may be BVG IBNR stop ids (digits) or plain station names — names are resolved automatically via `/stops?query=`.
 
 | Param | Meaning | Default |
 |-------|---------|---------|

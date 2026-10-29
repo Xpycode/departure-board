@@ -24,6 +24,7 @@
     width: 340px;
   }
   .widget {
+    position: relative;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -99,6 +100,60 @@
     font-size: 10px;
     color: var(--dim);
   }
+  .footer .right { display: flex; align-items: center; gap: 6px; }
+  .cfg-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 0 5px;
+    font-size: 9px;
+    font-family: inherit;
+    color: var(--dim);
+  }
+  .cfg-btn:hover { color: var(--text); }
+  .cfg-panel {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    padding: 10px 12px;
+    background: var(--panel);
+    overflow-y: auto;
+  }
+  .cfg-panel.open { display: block; }
+  .cfg-panel label {
+    display: block;
+    font-size: 10px;
+    color: var(--dim);
+    margin: 6px 0 2px;
+  }
+  .cfg-panel input {
+    width: 100%;
+    padding: 3px 6px;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .cfg-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .cfg-actions button {
+    flex: 1;
+    padding: 4px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--u-color);
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .cfg-actions button.secondary {
+    background: transparent;
+    color: var(--dim);
+    border: 1px solid var(--border);
+  }
 </style>
 </head>
 <body>
@@ -108,7 +163,25 @@
   <div class="station" id="station-r"></div>
   <div class="footer">
     <span id="status">loading…</span>
-    <span id="updated"></span>
+    <span class="right">
+      <button class="cfg-btn" id="cfg-open" title="Configure stations">setup</button>
+      <span id="updated"></span>
+    </span>
+  </div>
+  <div class="cfg-panel" id="cfg-panel">
+    <label for="cfg-s">S-Bahn station</label>
+    <input id="cfg-s" placeholder="S Humboldthain">
+    <label for="cfg-u">U-Bahn station</label>
+    <input id="cfg-u" placeholder="U Voltastraße">
+    <label for="cfg-r">Regional stations (comma-sep., cycled every 20 s)</label>
+    <input id="cfg-r" placeholder="S+U Gesundbrunnen,S+U Alexanderplatz">
+    <label for="cfg-n">Departures per direction</label>
+    <input id="cfg-n" type="number" min="1" max="4" value="2">
+    <div class="cfg-actions">
+      <button id="cfg-save">Save</button>
+      <button id="cfg-reset" class="secondary">Reset</button>
+      <button id="cfg-cancel" class="secondary">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -116,24 +189,27 @@
 (function () {
   "use strict";
 
-  // Configuration via URL params:
-  //   ?s=S Humboldthain&u=U Voltastraße  (names, or BVG IBNR stop ids like 900100003)
-  //   &r=S+U Gesundbrunnen,S+U Alexanderplatz  regional stops to cycle through
-  //   &n=2  departures per direction
-  // Defaults: S Humboldthain, U Voltastraße; regional block cycles
-  // Gesundbrunnen and Alexanderplatz (Stadtbahn RE construction detour).
+  // Station configuration precedence:
+  //   URL params > saved config (localStorage, set via the built-in setup
+  //   panel in the footer) > defaults.
   // Values may be IBNRs (digits) or station names; names are resolved
-  // automatically via the /stops?query= endpoint.
+  // automatically via the /stops?query= endpoint (the returned de:11000:*
+  // ids are converted to the IBNR the departures endpoint requires).
   var params = new URLSearchParams(location.search);
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem("bvg-widget-config") || "{}"); } catch (e) {}
+  function cfgValue(key, fallback) {
+    return params.get(key) || saved[key] || fallback;
+  }
   var STOPS = [
     { key: "s", kind: "suburban", label: "S", el: document.getElementById("station-s"),
-      stop: params.get("s") || "S Humboldthain" },
+      stop: cfgValue("s", "S Humboldthain") },
     { key: "u", kind: "subway", label: "U", el: document.getElementById("station-u"),
-      stop: params.get("u") || "U Voltastraße" }
+      stop: cfgValue("u", "U Voltastraße") }
   ];
-  var REGIONAL_STOPS = (params.get("r") || "S+U Gesundbrunnen,S+U Alexanderplatz")
+  var REGIONAL_STOPS = String(cfgValue("r", "S+U Gesundbrunnen,S+U Alexanderplatz"))
     .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
-  var PER_DIRECTION = parseInt(params.get("n") || "2", 10);
+  var PER_DIRECTION = parseInt(cfgValue("n", "2"), 10);
   var API = "https://v6.bvg.transport.rest";
   var REFRESH_MS = 30000;
   var ROTATE_MS = 20000;
@@ -149,17 +225,18 @@
     });
   }
 
-  function mins(iso) {
-    var d = new Date(iso);
-    var m = Math.round((d - Date.now()) / 60000);
+  function mins(dep) {
+    var when = dep && (dep.when || dep.plannedWhen);
+    if (!when) return 0;
+    var m = Math.round((new Date(when) - Date.now()) / 60000);
     return Math.max(0, m);
   }
 
   function fmt(dep) {
-    var m = mins(dep.when);
-    if (dep.when && mins(dep.when) === 0) return "now";
+    var m = mins(dep);
+    if (m === 0) return "now";
     if (m < 60) return m + " min";
-    return new Date(dep.when).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " *";
+    return new Date(dep.when || dep.plannedWhen).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " *";
   }
 
   function renderStation(cfg, data) {
@@ -180,7 +257,7 @@
     var rows = "";
     dirs.slice(0, 2).forEach(function (dir) {
       seen[dir].forEach(function (d) {
-        var m = mins(d.when);
+        var m = mins(d);
         var delay = "";
         if (d.delay && d.delay > 0) delay = "+" + Math.round(d.delay / 60);
         var cls = m <= 2 ? " soon" : "";
@@ -224,15 +301,23 @@
     el.style.color = isErr ? "var(--warn)" : "";
   }
 
+  function ibnrFromId(id) {
+    var m = /[0-9]{6,}/.exec(String(id || ""));
+    return m ? m[0] : null;
+  }
+
   function resolveId(stop) {
     if (/^\d{6,}$/.test(stop)) return Promise.resolve(stop);
     if (idCache[stop]) return Promise.resolve(idCache[stop]);
     return fetchJSON(API + "/stops?query=" + encodeURIComponent(stop) + "&results=5")
       .then(function (stops) {
+        // The API returns stations (type "station") with de:11000:<IBNR> ids;
+        // the departures endpoint needs the bare IBNR.
         for (var i = 0; i < stops.length; i++) {
-          if (stops[i].type === "stop") {
-            idCache[stop] = stops[i].id;
-            return stops[i].id;
+          var ibnr = ibnrFromId(stops[i].id);
+          if (ibnr && (stops[i].type === "stop" || stops[i].type === "station")) {
+            idCache[stop] = ibnr;
+            return ibnr;
           }
         }
         throw new Error("stop not found: " + stop);
@@ -269,6 +354,34 @@
       new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     setStatus("BVG live");
   }
+
+  // Built-in setup panel: configure stations in the browser; saved to
+  // localStorage so the served file itself never needs editing.
+  var cfgPanel = document.getElementById("cfg-panel");
+  document.getElementById("cfg-open").addEventListener("click", function () {
+    document.getElementById("cfg-s").value = STOPS[0].stop;
+    document.getElementById("cfg-u").value = STOPS[1].stop;
+    document.getElementById("cfg-r").value = REGIONAL_STOPS.join(",");
+    document.getElementById("cfg-n").value = PER_DIRECTION;
+    cfgPanel.classList.add("open");
+  });
+  document.getElementById("cfg-cancel").addEventListener("click", function () {
+    cfgPanel.classList.remove("open");
+  });
+  document.getElementById("cfg-reset").addEventListener("click", function () {
+    localStorage.removeItem("bvg-widget-config");
+    location.reload();
+  });
+  document.getElementById("cfg-save").addEventListener("click", function () {
+    var n = parseInt(document.getElementById("cfg-n").value, 10);
+    localStorage.setItem("bvg-widget-config", JSON.stringify({
+      s: document.getElementById("cfg-s").value.trim(),
+      u: document.getElementById("cfg-u").value.trim(),
+      r: document.getElementById("cfg-r").value.trim(),
+      n: isNaN(n) ? 2 : n
+    }));
+    location.reload();
+  });
 
   refresh();
   setInterval(refresh, REFRESH_MS);
