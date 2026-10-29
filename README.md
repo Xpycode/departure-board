@@ -64,7 +64,7 @@ shows that honestly for its slot instead of being skipped.
 
 - Refreshes every 30 seconds; S/U blocks look 30 minutes ahead, the RE block 4 hours (regional service is sparse — a shorter window is often empty).
 - The API filters products only by exclusion (`suburban=false&bus=false&...`); the widget builds those queries per block.
-- Shows minutes until departure (`now`, `3 min`, ...); absolute time with `*` if more than 60 minutes out.
+- Shows minutes until departure (`now`, `3 min`, ...) plus the absolute departure time in small dim text (`8 min 18:24`), so it can be cross-checked against the clock header. Beyond 60 minutes only the absolute time is shown (`19:22 *`).
 - Shows delay as `+2` in orange next to the time.
 - Shows the platform/track in a fixed column (realtime platform, falling back to the planned one). A platform that changed vs. plan is shown in orange.
 - The first still-catchable departure per direction (one that clears the lead time) is highlighted: orange accent bar, bold, `»` marker. Later departures are dimmed.

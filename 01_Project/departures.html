@@ -101,6 +101,7 @@
   td.when { text-align: right; font-weight: 700; white-space: nowrap; }
   td.when.soon { color: var(--warn); }
   td.when .delay { font-weight: 400; font-size: calc(11px * var(--scale)); color: var(--warn); margin-left: calc(3px * var(--scale)); }
+  td.when .abs { font-weight: 400; font-size: calc(10px * var(--scale)); color: var(--dim); margin-left: calc(4px * var(--scale)); }
   td.plat { text-align: right; font-weight: 700; white-space: nowrap; padding-right: calc(7px * var(--scale)); }
   td.plat.changed { color: var(--warn); }
   tr.later td.when { font-weight: 400; color: var(--dim); }
@@ -473,7 +474,14 @@
           ? '<td class="when"><span class="cx">fällt aus</span></td>'
           : '<td class="when' + (soon ? " soon" : "") + '">' +
             (catchRow ? "» " : "") + fmt(d) +
-            '<span class="delay">' + delay + "</span></td>";
+            '<span class="delay">' + delay + "</span>" +
+            // Absolute departure time (small, dim) next to the countdown —
+            // redundant beyond 60 min, where fmt() already shows the time.
+            (m < 60 ? '<span class="abs">' +
+              new Date(d.when || d.plannedWhen)
+                .toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) +
+              "</span>" : "") +
+            "</td>";
 
         rows += '<tr class="' + rowCls + '">' +
           '<td class="line"><span class="' + lineCls + '">' + lineName + "</span></td>" +
