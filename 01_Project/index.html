@@ -79,6 +79,23 @@
   scrolling="no"></iframe>
 
 <script>
+  // Preview convenience (same-origin only): resize the iframe to match the
+  // scale saved in the widget's setup panel. The real Icinga embed sets the
+  // size manually instead: width ~ 340 * scale, height ~ 300 * scale.
+  (function () {
+    try {
+      var cfg = JSON.parse(localStorage.getItem("bvg-widget-config") || "{}");
+      var s = Math.min(2, Math.max(0.8, parseFloat(cfg.scale) || 1));
+      if (s !== 1) {
+        var frame = document.getElementById("widget");
+        frame.style.width = Math.round(340 * s) + "px";
+        frame.style.height = Math.round(300 * s) + "px";
+      }
+    } catch (e) {}
+  })();
+</script>
+
+<script>
   var services = [
     ["web-01 / HTTP", "ok"], ["web-01 / Disk", "ok"], ["web-02 / HTTP", "ok"],
     ["db-01 / MySQL", "ok"], ["db-01 / Replication Lag", "warn"], ["mail / SMTP", "ok"],

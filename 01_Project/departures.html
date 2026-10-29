@@ -15,13 +15,14 @@
     --u-color: #005a94;
     --r-color: #b03030;
     --warn: #ffb347;
+    --scale: 1;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: transparent; }
   body {
     font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: var(--text);
-    width: 340px;
+    width: calc(340px * var(--scale));
   }
   .widget {
     position: relative;
@@ -31,21 +32,21 @@
     overflow: hidden;
     box-shadow: 0 4px 18px rgba(0,0,0,.45);
   }
-  .station { padding: 8px 12px 10px; }
+  .station { padding: calc(8px * var(--scale)) calc(12px * var(--scale)) calc(10px * var(--scale)); }
   .station + .station { border-top: 1px solid var(--border); }
   .station-head {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
+    gap: calc(6px * var(--scale));
+    margin-bottom: calc(6px * var(--scale));
   }
   .badge {
     display: inline-block;
-    min-width: 20px;
+    min-width: calc(20px * var(--scale));
     text-align: center;
     font-weight: 700;
-    font-size: 13px;
-    padding: 1px 5px;
+    font-size: calc(13px * var(--scale));
+    padding: calc(1px * var(--scale)) calc(5px * var(--scale));
     border-radius: 4px;
     color: #fff;
   }
@@ -53,7 +54,7 @@
   .badge.u { background: var(--u-color); }
   .badge.r { background: var(--r-color); }
   .station-name {
-    font-size: 13px;
+    font-size: calc(13px * var(--scale));
     font-weight: 600;
     color: var(--text);
     white-space: nowrap;
@@ -61,20 +62,20 @@
     text-overflow: ellipsis;
   }
   .station-error {
-    font-size: 12px;
+    font-size: calc(12px * var(--scale));
     color: var(--warn);
-    padding: 2px 0 4px;
+    padding: calc(2px * var(--scale)) 0 calc(4px * var(--scale));
   }
   table { width: 100%; border-collapse: collapse; }
-  td { padding: 2px 0; font-size: 13px; vertical-align: baseline; }
-  td.line { width: 52px; }
+  td { padding: calc(2px * var(--scale)) 0; font-size: calc(13px * var(--scale)); vertical-align: baseline; }
+  td.line { width: calc(52px * var(--scale)); }
   td.line span {
     display: inline-block;
-    min-width: 34px;
+    min-width: calc(34px * var(--scale));
     text-align: center;
     font-weight: 700;
-    font-size: 12px;
-    padding: 1px 4px;
+    font-size: calc(12px * var(--scale));
+    padding: calc(1px * var(--scale)) calc(4px * var(--scale));
     border-radius: 3px;
     color: #fff;
     background: #444;
@@ -87,27 +88,27 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 150px;
+    max-width: calc(150px * var(--scale));
   }
   td.when { text-align: right; font-weight: 700; white-space: nowrap; }
   td.when.soon { color: var(--warn); }
-  td.when .delay { font-weight: 400; font-size: 11px; color: var(--warn); margin-left: 3px; }
+  td.when .delay { font-weight: 400; font-size: calc(11px * var(--scale)); color: var(--warn); margin-left: calc(3px * var(--scale)); }
   .footer {
     display: flex;
     justify-content: space-between;
-    padding: 4px 12px;
+    padding: calc(4px * var(--scale)) calc(12px * var(--scale));
     background: rgba(0,0,0,.25);
-    font-size: 10px;
+    font-size: calc(10px * var(--scale));
     color: var(--dim);
   }
-  .footer .right { display: flex; align-items: center; gap: 6px; }
+  .footer .right { display: flex; align-items: center; gap: calc(6px * var(--scale)); }
   .cfg-btn {
     background: none;
     border: 1px solid var(--border);
     border-radius: 3px;
     cursor: pointer;
-    padding: 0 5px;
-    font-size: 9px;
+    padding: 0 calc(5px * var(--scale));
+    font-size: calc(9px * var(--scale));
     font-family: inherit;
     color: var(--dim);
   }
@@ -117,31 +118,31 @@
     position: absolute;
     inset: 0;
     z-index: 10;
-    padding: 10px 12px;
+    padding: calc(10px * var(--scale)) calc(12px * var(--scale));
     background: var(--panel);
     overflow-y: auto;
   }
   .cfg-panel.open { display: block; }
   .cfg-panel label {
     display: block;
-    font-size: 10px;
+    font-size: calc(10px * var(--scale));
     color: var(--dim);
-    margin: 6px 0 2px;
+    margin: calc(6px * var(--scale)) 0 calc(2px * var(--scale));
   }
   .cfg-panel input {
     width: 100%;
-    padding: 3px 6px;
-    font-size: 12px;
+    padding: calc(3px * var(--scale)) calc(6px * var(--scale));
+    font-size: calc(12px * var(--scale));
     color: var(--text);
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 4px;
   }
-  .cfg-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .cfg-actions { display: flex; gap: calc(6px * var(--scale)); margin-top: calc(10px * var(--scale)); }
   .cfg-actions button {
     flex: 1;
-    padding: 4px 0;
-    font-size: 12px;
+    padding: calc(4px * var(--scale)) 0;
+    font-size: calc(12px * var(--scale));
     font-weight: 600;
     color: #fff;
     background: var(--u-color);
@@ -177,6 +178,8 @@
     <input id="cfg-r" placeholder="S+U Gesundbrunnen,S+U Alexanderplatz">
     <label for="cfg-n">Departures per direction</label>
     <input id="cfg-n" type="number" min="1" max="4" value="2">
+    <label for="cfg-scale">Display scale (0.8–2, resize the iframe to match)</label>
+    <input id="cfg-scale" type="number" step="0.1" min="0.8" max="2" value="1">
     <div class="cfg-actions">
       <button id="cfg-save">Save</button>
       <button id="cfg-reset" class="secondary">Reset</button>
@@ -210,6 +213,8 @@
   var REGIONAL_STOPS = String(cfgValue("r", "S+U Gesundbrunnen,S+U Alexanderplatz"))
     .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
   var PER_DIRECTION = parseInt(cfgValue("n", "2"), 10);
+  var SCALE = Math.min(2, Math.max(0.8, parseFloat(cfgValue("scale", "1")) || 1));
+  document.documentElement.style.setProperty("--scale", String(SCALE));
   var API = "https://v6.bvg.transport.rest";
   var REFRESH_MS = 30000;
   var ROTATE_MS = 20000;
@@ -342,7 +347,7 @@
   function loadRegional() {
     if (!REGIONAL_STOPS.length) return;
     loadDepartures(regionalCfg, REGIONAL_STOPS[rIndex % REGIONAL_STOPS.length],
-      "results=20&regional=true®ionalExp=true&express=true&national=true");
+      "results=20&regional=true&regionalExp=true&express=true&national=true");
   }
 
   function refresh() {
@@ -363,6 +368,7 @@
     document.getElementById("cfg-u").value = STOPS[1].stop;
     document.getElementById("cfg-r").value = REGIONAL_STOPS.join(",");
     document.getElementById("cfg-n").value = PER_DIRECTION;
+    document.getElementById("cfg-scale").value = SCALE;
     cfgPanel.classList.add("open");
   });
   document.getElementById("cfg-cancel").addEventListener("click", function () {
@@ -374,11 +380,13 @@
   });
   document.getElementById("cfg-save").addEventListener("click", function () {
     var n = parseInt(document.getElementById("cfg-n").value, 10);
+    var scale = parseFloat(document.getElementById("cfg-scale").value);
     localStorage.setItem("bvg-widget-config", JSON.stringify({
       s: document.getElementById("cfg-s").value.trim(),
       u: document.getElementById("cfg-u").value.trim(),
       r: document.getElementById("cfg-r").value.trim(),
-      n: isNaN(n) ? 2 : n
+      n: isNaN(n) ? 2 : n,
+      scale: isNaN(scale) ? 1 : Math.min(2, Math.max(0.8, scale))
     }));
     location.reload();
   });

@@ -40,6 +40,7 @@ Values may be BVG IBNR stop ids (digits) or plain station names — names are re
 | `u`   | U-Bahn stop (id or name) | `U Voltastraße` |
 | `r`   | Regional stops to cycle through (comma-separated) | `S+U Gesundbrunnen,S+U Alexanderplatz` |
 | `n`   | Departures per direction  | `2` |
+| `scale` | Display scale (0.8–2) — makes everything in the widget proportionally larger/smaller | `1` |
 
 Example: `departures.html?s=900100003&u=900100053&n=3`
 
@@ -85,6 +86,8 @@ In your Icinga source, add the same fixed-position iframe pointing at the NUC fo
                border: 0; background: transparent;"
         scrolling="no"></iframe>
 ```
+
+If you use a display scale `s` (setup panel or `?scale=`), size the iframe to match: `width = 340 × s`, `height = 300 × s` (e.g. scale 1.5 → 510 × 450). Set the size in the Icinga page source; the widget itself cannot resize its frame from inside.
 
 ## Notes
 
