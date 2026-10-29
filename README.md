@@ -47,7 +47,8 @@ Example: `departures.html?s=900100003&u=900100053&n=3`
 The third block (red `RE` badge) shows regional trains (RE/RB/IC/ICE) and
 alternates between the configured `r` stops every 20 seconds — useful while
 the Stadtbahn regional platforms (Alexanderplatz) are under construction
-and traffic shifts to Gesundbrunnen.
+and traffic shifts to Gesundbrunnen. A cycling station with no regional
+departures is skipped immediately in favor of the next one with departures.
 
 ## Behavior
 

@@ -330,11 +330,11 @@
   }
 
   function loadDepartures(cfg, stop, query) {
-    resolveId(stop)
+    return resolveId(stop)
       .then(function (id) {
         return fetchJSON(API + "/stops/" + encodeURIComponent(id) + "/departures?" + query);
       })
-      .then(function (data) { renderStation(cfg, data); })
+      .then(function (data) { renderStation(cfg, data); return data; })
       .catch(function (err) {
         cfg.el.innerHTML =
           '<div class="station-head"><span class="badge ' + cfg.key + '">' + cfg.label +
@@ -344,10 +344,27 @@
       });
   }
 
-  function loadRegional() {
+  function hasRegionalDepartures(data) {
+    return (data.departures || []).some(function (d) {
+      return d.line && R_PRODUCTS.indexOf(d.line.product) !== -1;
+    });
+  }
+
+  // Loads the current RE cycling station; if it has no regional departures
+  // (e.g. construction-related gaps at some stations), advance to the next
+  // one instead of showing an empty block for a full rotation slot.
+  function loadRegional(attempt) {
     if (!REGIONAL_STOPS.length) return;
+    attempt = attempt || 0;
     loadDepartures(regionalCfg, REGIONAL_STOPS[rIndex % REGIONAL_STOPS.length],
-      "results=20&regional=true&regionalExp=true&express=true&national=true");
+      "results=20&regional=true&regionalExp=true&express=true&national=true")
+      .then(function (data) {
+        if (!hasRegionalDepartures(data) && REGIONAL_STOPS.length > 1 &&
+            attempt < REGIONAL_STOPS.length - 1) {
+          rIndex++;
+          loadRegional(attempt + 1);
+        }
+      });
   }
 
   function refresh() {
@@ -400,11 +417,13 @@
   // Report the rendered size to the embedding page so the iframe can fit
   // the content exactly (the widget cannot resize its own frame). Works
   // cross-origin via postMessage; the parent decides whether to listen.
+  // Measures the widget element: document scroll sizes never shrink below
+  // the current iframe size, which froze the frame at its largest size.
   function notifySize() {
     if (window.parent === window) return;
-    var doc = document.documentElement;
+    var box = document.getElementById("widget");
     window.parent.postMessage(
-      { type: "bvg-widget-size", width: doc.scrollWidth, height: doc.scrollHeight }, "*");
+      { type: "bvg-widget-size", width: box.offsetWidth, height: box.offsetHeight }, "*");
   }
   new MutationObserver(notifySize).observe(document.getElementById("widget"),
     { childList: true, subtree: true, characterData: true });
