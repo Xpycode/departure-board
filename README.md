@@ -63,6 +63,7 @@ departures.
 - Shows minutes until departure (`now`, `3 min`, ...); absolute time with `*` if more than 60 minutes out.
 - Shows delay as `+2` in orange next to the time.
 - Departures are grouped per direction (terminus) — up to 2 directions, e.g. eastbound + westbound.
+- Info line: disruption warnings of the displayed trains (API "warning" remarks, e.g. line cancellations or construction replacements) scroll in a yellow line above the footer, like real station boards; the line is hidden when there are none.
 
 ## Deploying to the NUC
 

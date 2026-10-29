@@ -100,6 +100,23 @@
   td.when { text-align: right; font-weight: 700; white-space: nowrap; }
   td.when.soon { color: var(--warn); }
   td.when .delay { font-weight: 400; font-size: calc(11px * var(--scale)); color: var(--warn); margin-left: calc(3px * var(--scale)); }
+  .ticker {
+    overflow: hidden;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,.25);
+    font-size: calc(10px * var(--scale));
+    color: var(--warn);
+  }
+  .ticker .scroll {
+    display: inline-block;
+    white-space: nowrap;
+    padding: calc(3px * var(--scale)) 0 calc(3px * var(--scale)) 100%;
+    animation: ticker-scroll linear infinite;
+  }
+  @keyframes ticker-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-100%); }
+  }
   .footer {
     display: flex;
     justify-content: space-between;
@@ -166,6 +183,7 @@
   <div class="station" id="station-s"></div>
   <div class="station" id="station-u"></div>
   <div class="station" id="station-r"></div>
+  <div class="ticker" id="ticker" style="display: none"></div>
   <div class="footer">
     <span id="status">loading…</span>
     <span class="right">
@@ -253,6 +271,7 @@
   var R_PRODUCTS = ["regional", "express"];
   var regionalCfg = { key: "r", label: "RE", el: document.getElementById("station-r"),
     lineFilter: REGIONAL_LINES.length ? REGIONAL_LINES : null };
+  var tickerEl = document.getElementById("ticker");
   var idCache = {};
 
   function fetchJSON(url) {
@@ -306,6 +325,17 @@
   function renderStation(cfg, data) {
     var departures = usableDepartures(cfg, data);
 
+    // Collect system-wide disruption messages ("warning" remarks) of the
+    // displayed trains for the scrolling info line.
+    cfg.warnings = [];
+    departures.forEach(function (d) {
+      (d.remarks || []).forEach(function (r) {
+        if (r.type === "warning" && r.text && cfg.warnings.indexOf(r.text) === -1) {
+          cfg.warnings.push(r.text);
+        }
+      });
+    });
+
     // Group into directions by the line's terminus (direction field).
     var seen = {}, dirs = [];
     departures.forEach(function (d) {
@@ -345,6 +375,29 @@
         ? "<table><tbody>" + rows + "</tbody></table>"
         : '<div class="station-error">No departures in the next ' +
           (cfg.key === "r" ? "90" : "30") + " min</div>");
+    updateTicker();
+  }
+
+  // Scrolling info line, like real station boards: shows the union of the
+  // disruption warnings ("warning" remarks) of all displayed trains. Hidden
+  // when there are none. Scroll duration adapts to the message length.
+  function updateTicker() {
+    var seen = {}, msgs = [];
+    [STOPS[0], STOPS[1], regionalCfg].forEach(function (cfg) {
+      (cfg.warnings || []).forEach(function (w) {
+        if (!seen[w]) { seen[w] = true; msgs.push(w); }
+      });
+    });
+    if (!msgs.length) {
+      tickerEl.style.display = "none";
+      tickerEl.innerHTML = "";
+      return;
+    }
+    var text = msgs.join("  +++  ");
+    tickerEl.style.display = "block";
+    tickerEl.innerHTML = '<div class="scroll">' + escapeHtml(text) + "</div>";
+    tickerEl.firstChild.style.animationDuration =
+      Math.max(15, Math.round(text.length * 0.4)) + "s";
   }
 
   function stationName(data, departures, cfg) {
@@ -398,11 +451,13 @@
       })
       .then(function (data) { renderStation(cfg, data); return data; })
       .catch(function (err) {
+        cfg.warnings = [];
         cfg.el.innerHTML =
           '<div class="station-head"><span class="badge ' + cfg.key + '">' + cfg.label +
           '</span><span class="station-name">' + escapeHtml(stop) + "</span></div>" +
           '<div class="station-error">API error: ' + escapeHtml(err.message) + "</div>";
         setStatus("API error", true);
+        updateTicker();
       });
   }
 
@@ -425,7 +480,7 @@
     var idx = rIndex % REGIONAL_STOPS.length;
     regionalCfg.minLead = regionalLead(idx);
     loadDepartures(regionalCfg, REGIONAL_STOPS[idx],
-      "results=20&duration=90&" + productsQuery(R_PRODUCTS))
+      "results=20&duration=90&remarks=true&" + productsQuery(R_PRODUCTS))
       .then(function (data) {
         if (!hasRegionalDepartures(data) && REGIONAL_STOPS.length > 1 &&
             attempt < REGIONAL_STOPS.length - 1) {
@@ -437,7 +492,7 @@
 
   function refresh() {
     STOPS.forEach(function (cfg) {
-      loadDepartures(cfg, cfg.stop, "results=20&duration=30&" + productsQuery([cfg.kind]));
+      loadDepartures(cfg, cfg.stop, "results=20&duration=30&remarks=true&" + productsQuery([cfg.kind]));
     });
     loadRegional();
     document.getElementById("updated").textContent =
