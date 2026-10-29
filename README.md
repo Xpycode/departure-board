@@ -52,9 +52,29 @@ and traffic shifts to Gesundbrunnen.
 - Shows delay as `+2` in orange next to the time.
 - Departures are grouped per direction (terminus) — up to 2 directions, e.g. eastbound + westbound.
 
+## Deploying to the NUC
+
+The NUC does not get a copy of this repo. It gets a folder with exactly one file:
+
+```
+departure-widget/
+└── departures.html    ← copied from 01_Project/ — fully self-contained (no CSS/JS/font files)
+```
+
+Serve it with any static server on the NUC, e.g. (Windows, Python installed):
+
+```bat
+python -m http.server 8000 --directory C:\departure-widget
+```
+
+Requirements:
+
+- The NUC needs internet access to `https://v6.bvg.transport.rest` (the only external dependency).
+- Station configuration goes in the iframe URL, not the file — so keep the file unmodified for easy updates (just overwrite it when the widget changes).
+
 ## Embedding in the real Icinga page
 
-In your Icinga source, add the same fixed-position iframe pointing to wherever `departures.html` is hosted (localhost is fine since the NUC's Chrome opens the Icinga page directly):
+In your Icinga source, add the same fixed-position iframe pointing at the NUC folder's served URL (localhost is fine since the NUC's Chrome opens the Icinga page directly):
 
 ```html
 <iframe src="http://localhost:8000/departures.html"

@@ -42,6 +42,7 @@ URL params on `departures.html`: `?s={S-Bahn stop IBNR}&u={U-Bahn stop IBNR}&n={
 - [ ] Integrate the iframe snippet into the real Icinga page source (user will provide the source code later — session hand-off point, continue via CLI).
 - [ ] Verify rendering on the TV/NUC (Chrome on Windows) — especially readability at TV distance; may need a font-size scale config option.
 - [ ] Position moved to bottom-right (user correction in session 4) — update `index.html` stand-in accordingly when integrating.
+- [ ] NUC deployment: the NUC gets its own folder with only `01_Project/departures.html` (self-contained single file), not a copy of this repo; serve via a local static server, config stays in the iframe URL.
 
 ## Session history
 
@@ -50,3 +51,4 @@ URL params on `departures.html`: `?s={S-Bahn stop IBNR}&u={U-Bahn stop IBNR}&n={
 3. **2026-10-29 (session 3)** — Added this log (`PROJECT_LOG.md`) and the verified screenshot.
 4. **2026-10-29 (session 4)** — New station defaults (S Humboldthain, U Voltastraße); added third "RE" block for regional trains cycling between S+U Gesundbrunnen and S+U Alexanderplatz every 20s (Stadtbahn RE construction); stop params now accept names or IBNRs (auto-resolved via `/stops?query=`); user clarified widget position is bottom-right. JS syntax-checked with `node --check`.
 5. **2026-10-29 (session 5)** — Merged the two remote `vibe/*` branches (regional block, design reference) into `main` locally and pushed; BVG API endpoints re-verified live. Restructured the repo to the standard numbered folder layout: site code into `01_Project/`, design reference into `02_Design/`, screenshot into `03_Screenshots/`, this log into `docs/`; added `.gitignore`; README updated for the new paths.
+6. **2026-10-29 (session 6)** — Deployment decision: the NUC will get a standalone folder with only `departures.html` (verified self-contained: no local asset references, sole runtime dependency is the BVG API), not a copy of this repo. README gained a "Deploying to the NUC" section; config stays in the iframe URL so the file can be updated by overwrite.
