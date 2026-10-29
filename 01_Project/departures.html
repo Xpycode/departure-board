@@ -16,6 +16,7 @@
     --r-color: #b03030;
     --warn: #ffb347;
     --scale: 1;
+    --ts: 12px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: transparent; }
@@ -104,8 +105,9 @@
     overflow: hidden;
     border-top: 1px solid var(--border);
     background: rgba(0,0,0,.25);
-    font-size: calc(10px * var(--scale));
+    font-size: calc(var(--ts) * var(--scale));
     color: var(--warn);
+    cursor: pointer;
   }
   .ticker .scroll {
     display: inline-block;
@@ -210,6 +212,8 @@
     <input id="cfg-n" type="number" min="1" max="4" value="2">
     <label for="cfg-scale">Display scale (0.8–2, resize the iframe to match)</label>
     <input id="cfg-scale" type="number" step="0.1" min="0.8" max="2" value="1">
+    <label for="cfg-ts">Info line text size (px, 8–18)</label>
+    <input id="cfg-ts" type="number" step="1" min="8" max="18" value="12">
     <div class="cfg-actions">
       <button id="cfg-save">Save</button>
       <button id="cfg-reset" class="secondary">Reset</button>
@@ -258,6 +262,8 @@
   var PER_DIRECTION = parseInt(cfgValue("n", "2"), 10);
   var SCALE = Math.min(2, Math.max(0.8, parseFloat(cfgValue("scale", "1")) || 1));
   document.documentElement.style.setProperty("--scale", String(SCALE));
+  var TICKER_SIZE = Math.min(18, Math.max(8, parseFloat(cfgValue("ts", "12")) || 12));
+  document.documentElement.style.setProperty("--ts", TICKER_SIZE + "px");
   var API = "https://v6.bvg.transport.rest";
   var REFRESH_MS = 30000;
   var ROTATE_MS = 20000;
@@ -380,7 +386,19 @@
 
   // Scrolling info line, like real station boards: shows the union of the
   // disruption warnings ("warning" remarks) of all displayed trains. Hidden
-  // when there are none. Scroll duration adapts to the message length.
+  // when there are none. Scroll duration adapts to the message length;
+  // clicking the line cycles the scroll speed (1x -> 2x -> 4x).
+  var tickerSpeed = 1;
+  var tickerBaseSec = 15;
+  function setTickerDuration() {
+    tickerEl.firstChild.style.animationDuration =
+      Math.max(4, Math.round(tickerBaseSec / tickerSpeed)) + "s";
+  }
+  tickerEl.addEventListener("click", function () {
+    tickerSpeed = tickerSpeed === 1 ? 2 : tickerSpeed === 2 ? 4 : 1;
+    if (tickerEl.firstChild) setTickerDuration();
+  });
+
   function updateTicker() {
     var seen = {}, msgs = [];
     [STOPS[0], STOPS[1], regionalCfg].forEach(function (cfg) {
@@ -394,10 +412,10 @@
       return;
     }
     var text = msgs.join("  +++  ");
+    tickerBaseSec = Math.max(15, Math.round(text.length * 0.4));
     tickerEl.style.display = "block";
     tickerEl.innerHTML = '<div class="scroll">' + escapeHtml(text) + "</div>";
-    tickerEl.firstChild.style.animationDuration =
-      Math.max(15, Math.round(text.length * 0.4)) + "s";
+    setTickerDuration();
   }
 
   function stationName(data, departures, cfg) {
@@ -513,6 +531,7 @@
     document.getElementById("cfg-rf").value = REGIONAL_LINES.join(",");
     document.getElementById("cfg-n").value = PER_DIRECTION;
     document.getElementById("cfg-scale").value = SCALE;
+    document.getElementById("cfg-ts").value = TICKER_SIZE;
     cfgPanel.classList.add("open");
     notifySize();
   });
@@ -527,6 +546,7 @@
   document.getElementById("cfg-save").addEventListener("click", function () {
     var n = parseInt(document.getElementById("cfg-n").value, 10);
     var scale = parseFloat(document.getElementById("cfg-scale").value);
+    var ts = parseFloat(document.getElementById("cfg-ts").value);
     localStorage.setItem("bvg-widget-config", JSON.stringify({
       s: document.getElementById("cfg-s").value.trim(),
       sl: document.getElementById("cfg-sl").value.trim(),
@@ -536,7 +556,8 @@
       rl: document.getElementById("cfg-rl").value.trim(),
       rf: document.getElementById("cfg-rf").value.trim(),
       n: isNaN(n) ? 2 : n,
-      scale: isNaN(scale) ? 1 : Math.min(2, Math.max(0.8, scale))
+      scale: isNaN(scale) ? 1 : Math.min(2, Math.max(0.8, scale)),
+      ts: isNaN(ts) ? 12 : Math.min(18, Math.max(8, ts))
     }));
     location.reload();
   });
