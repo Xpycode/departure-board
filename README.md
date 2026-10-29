@@ -53,13 +53,13 @@ The third block (red `RE` badge) shows regional trains (RE/RB/IC/ICE) and
 alternates between the configured `r` stops every 20 seconds — useful while
 the Stadtbahn regional platforms (Alexanderplatz) are under construction
 and traffic shifts to Gesundbrunnen. A countdown in the RE header shows the
-next station and the seconds until the switch; it hides while only one
-station has departures. A cycling station with no catchable departures is
-benched for 10 minutes and retried automatically afterwards.
+next station and the seconds until the switch; every configured station
+gets its slot in turn. A station with no departures in the 4-hour window
+shows that honestly for its slot instead of being skipped.
 
 ## Behavior
 
-- Refreshes every 30 seconds; S/U blocks look 30 minutes ahead, the RE block 90 minutes (regional trains run every 20–30+ minutes, so a shorter window is often empty).
+- Refreshes every 30 seconds; S/U blocks look 30 minutes ahead, the RE block 4 hours (regional service is sparse — a shorter window is often empty).
 - The API filters products only by exclusion (`suburban=false&bus=false&...`); the widget builds those queries per block.
 - Shows minutes until departure (`now`, `3 min`, ...); absolute time with `*` if more than 60 minutes out.
 - Shows delay as `+2` in orange next to the time.

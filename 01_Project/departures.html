@@ -280,11 +280,6 @@
   var REFRESH_MS = 30000;
   var ROTATE_MS = 20000;
   var rIndex = 0;
-  // A cycling station whose fetch comes back empty (construction gaps) is
-  // benched for this long before being retried, instead of being re-attempted
-  // (and skipped) on every rotation slot.
-  var EMPTY_RETRY_MS = 10 * 60 * 1000;
-  var emptyUntil = {};
   // Product filtering on the BVG v6 API: the per-product booleans
   // (suburban, subway, tram, bus, ferry, express, regional) are include
   // flags that all default to true, so filtering happens by excluding
@@ -398,7 +393,7 @@
       (rows
         ? "<table><tbody>" + rows + "</tbody></table>"
         : '<div class="station-error">No departures in the next ' +
-          (cfg.key === "r" ? "90" : "30") + " min</div>");
+          (cfg.key === "r" ? "4 h" : "30 min") + "</div>");
     updateTicker();
   }
 
@@ -563,49 +558,21 @@
       });
   }
 
-  function hasRegionalDepartures(data) {
-    return usableDepartures(regionalCfg, data).length > 0;
-  }
-
   function regionalLead(idx) {
     if (!REGIONAL_LEADS.length) return 0;
     return REGIONAL_LEADS[Math.min(idx, REGIONAL_LEADS.length - 1)];
   }
 
-  // Next cycling-station index after `from` that is not benched (empty).
-  function nextEligibleIndex(from) {
-    var len = REGIONAL_STOPS.length;
-    for (var k = 1; k <= len; k++) {
-      var i = (from + k) % len;
-      if ((emptyUntil[REGIONAL_STOPS[i]] || 0) <= Date.now()) return i;
-    }
-    return from;
-  }
-
   // Loads the current RE cycling station. Regional trains run every 20-30+
-  // minutes, so fetch a 90-minute window. A station with no catchable
-  // departures is benched for EMPTY_RETRY_MS and the block immediately
-  // advances to the next eligible station.
-  function loadRegional(attempt) {
+  // minutes and construction can thin them out further, so fetch a long
+  // window (4 hours): the block shows the next trains that actually leave,
+  // however far out, and rotates through every configured station in turn.
+  function loadRegional() {
     if (!REGIONAL_STOPS.length) return;
-    attempt = attempt || 0;
     var idx = rIndex % REGIONAL_STOPS.length;
-    var station = REGIONAL_STOPS[idx];
     regionalCfg.minLead = regionalLead(idx);
-    loadDepartures(regionalCfg, station,
-      "results=20&duration=90&remarks=true&" + productsQuery(R_PRODUCTS))
-      .then(function (data) {
-        if (hasRegionalDepartures(data)) {
-          delete emptyUntil[station];
-          return;
-        }
-        if (REGIONAL_STOPS.length > 1) emptyUntil[station] = Date.now() + EMPTY_RETRY_MS;
-        var next = nextEligibleIndex(idx);
-        if (next !== idx && attempt < REGIONAL_STOPS.length) {
-          rIndex = next;
-          loadRegional(attempt + 1);
-        }
-      });
+    loadDepartures(regionalCfg, REGIONAL_STOPS[idx],
+      "results=20&duration=240&remarks=true&" + productsQuery(R_PRODUCTS));
   }
 
   function refresh() {
@@ -666,25 +633,22 @@
   setInterval(refresh, REFRESH_MS);
   if (REGIONAL_STOPS.length > 1) {
     // One ticker drives the RE rotation: counts down to the next station
-    // switch and shows the remaining seconds in the RE block header.
-    // Benched (empty) stations are not switch targets; the countdown hides
-    // while only one station has departures.
+    // switch and shows the remaining seconds in the RE block header. Every
+    // configured station gets its slot in turn, even if it has no
+    // departures in the fetch window (shown honestly while it lasts).
     var rSecondsLeft = ROTATE_MS / 1000;
     setInterval(function () {
-      var cur = rIndex % REGIONAL_STOPS.length;
       rSecondsLeft--;
       if (rSecondsLeft <= 0) {
-        rIndex = nextEligibleIndex(cur);
+        rIndex++;
         loadRegional();
         rSecondsLeft = ROTATE_MS / 1000;
-        cur = rIndex % REGIONAL_STOPS.length;
       }
       var cd = document.getElementById("r-countdown");
-      if (!cd) return;
-      var target = nextEligibleIndex(cur);
-      cd.textContent = target === cur
-        ? ""
-        : "→ " + REGIONAL_STOPS[target] + " · " + rSecondsLeft + " s";
+      if (cd) {
+        cd.textContent = "→ " + REGIONAL_STOPS[(rIndex + 1) % REGIONAL_STOPS.length] +
+          " · " + rSecondsLeft + " s";
+      }
     }, 1000);
   }
 
