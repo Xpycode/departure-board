@@ -40,7 +40,7 @@ Values may be BVG IBNR stop ids (digits) or plain station names — names are re
 | `sl`  | S lead time (min walk — hides trains leaving sooner) | `8` |
 | `u`   | U-Bahn stop (id or name) | `U Voltastraße` |
 | `ul`  | U lead time (min walk — hides trains leaving sooner) | `12` |
-| `r`   | Regional stops to cycle through (comma-separated) | `S+U Gesundbrunnen,S+U Alexanderplatz` |
+| `r`   | Regional stops to cycle through (comma-separated) | `S+U Gesundbrunnen,S Charlottenburg,S Ostbahnhof` |
 | `rl`  | RE lead time in minutes (one per station, comma-sep.) — hides trains leaving sooner than the walk to that station | `10` |
 | `rf`  | Only these RE lines (comma-separated, substring match, empty = all) | — |
 | `n`   | Departures per direction  | `2` |
@@ -50,9 +50,12 @@ Values may be BVG IBNR stop ids (digits) or plain station names — names are re
 Example: `departures.html?s=900100003&u=900100053&n=3`
 
 The third block (red `RE` badge) shows regional trains (RE/RB/IC/ICE) and
-alternates between the configured `r` stops every 20 seconds — useful while
-the Stadtbahn regional platforms (Alexanderplatz) are under construction
-and traffic shifts to Gesundbrunnen. A countdown in the RE header shows the
+alternates between the configured `r` stops every 20 seconds. The default
+rotation is Gesundbrunnen (north ring, where regional traffic shifted during
+the construction), plus Charlottenburg and Ostbahnhof, where the RE/RB lines
+terminate while the Stadtbahn is closed to regional traffic (14 June –
+12 December 2026); after 12 December, consider adding back
+S+U Alexanderplatz. A countdown in the RE header shows the
 next station and the seconds until the switch; every configured station
 gets its slot in turn. A station with no departures in the 4-hour window
 shows that honestly for its slot instead of being skipped.

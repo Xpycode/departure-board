@@ -215,7 +215,7 @@
     <label for="cfg-ul">U lead time (min walk — hides trains leaving sooner)</label>
     <input id="cfg-ul" type="number" min="0" step="1" value="12">
     <label for="cfg-r">Regional stations (comma-sep., cycled every 20 s)</label>
-    <input id="cfg-r" placeholder="S+U Gesundbrunnen,S+U Alexanderplatz">
+    <input id="cfg-r" placeholder="S+U Gesundbrunnen,S Charlottenburg,S Ostbahnhof">
     <label for="cfg-rl">RE lead time (min, one per station, comma-sep.) — hides trains leaving sooner than the walk there</label>
     <input id="cfg-rl" placeholder="10  or  10,20">
     <label for="cfg-rf">Only these RE lines (comma-sep., empty = all, e.g. RE,ICE)</label>
@@ -260,7 +260,7 @@
     { key: "u", kind: "subway", label: "U", el: document.getElementById("station-u"),
       stop: cfgValue("u", "U Voltastraße"), minLead: parseLead(cfgValue("ul", "12")) }
   ];
-  var REGIONAL_STOPS = String(cfgValue("r", "S+U Gesundbrunnen,S+U Alexanderplatz"))
+  var REGIONAL_STOPS = String(cfgValue("r", "S+U Gesundbrunnen,S Charlottenburg,S Ostbahnhof"))
     .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
   // Lead time per RE station (minutes): departures sooner than the walk
   // to that station are hidden. One value applies to all; a comma list
