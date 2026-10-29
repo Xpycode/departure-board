@@ -262,6 +262,8 @@
     <input id="cfg-scale" type="number" step="0.1" min="0.8" max="2" value="1">
     <label for="cfg-ts">Info line text size (px, 8–18)</label>
     <input id="cfg-ts" type="number" step="1" min="8" max="18" value="12">
+    <label for="cfg-api">BVG API base URL (empty = public instance; internal proxy: /api)</label>
+    <input id="cfg-api" placeholder="https://v6.bvg.transport.rest">
     <div class="cfg-actions">
       <button id="cfg-save">Save</button>
       <button id="cfg-reset" class="secondary">Reset</button>
@@ -312,8 +314,11 @@
   document.documentElement.style.setProperty("--scale", String(SCALE));
   var TICKER_SIZE = Math.min(18, Math.max(8, parseFloat(cfgValue("ts", "12")) || 12));
   document.documentElement.style.setProperty("--ts", TICKER_SIZE + "px");
-  var API = "https://v6.bvg.transport.rest";
-  var REFRESH_MS = 30000;
+  // API base: the public BVG transport.rest instance by default, or a
+  // caching proxy (e.g. a relative "/api" when served by the internal
+  // departure server) so many widget instances share one upstream caller.
+  var API = String(cfgValue("api", "https://v6.bvg.transport.rest")).replace(/\/+$/, "");
+  var REFRESH_MS = 60000;
   // 24/7 resilience: reload the page every 4 h to reset the heap
   // (long-lived dashboard tabs are a documented leak/crash risk);
   // data older than 15 min counts as stale (red status dot).
@@ -754,6 +759,7 @@
     document.getElementById("cfg-n").value = PER_DIRECTION;
     document.getElementById("cfg-scale").value = SCALE;
     document.getElementById("cfg-ts").value = TICKER_SIZE;
+    document.getElementById("cfg-api").value = API;
     cfgPanel.classList.add("open");
     notifySize();
   });
@@ -779,7 +785,8 @@
       rf: document.getElementById("cfg-rf").value.trim(),
       n: isNaN(n) ? 2 : n,
       scale: isNaN(scale) ? 1 : Math.min(2, Math.max(0.8, scale)),
-      ts: isNaN(ts) ? 12 : Math.min(18, Math.max(8, ts))
+      ts: isNaN(ts) ? 12 : Math.min(18, Math.max(8, ts)),
+      api: document.getElementById("cfg-api").value.trim()
     }));
     location.reload();
   });

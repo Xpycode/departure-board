@@ -11,6 +11,7 @@ departure-board/               ← repo root
 │   └── departures.html        — the actual widget: one S-Bahn station and one U-Bahn station, next departures for both directions each, live from the [BVG transport.rest API](https://v6.bvg.transport.rest/).
 ├── 02_Design/DESIGN.md        — Berlin S-Bahn/U-Bahn design and iconography reference.
 ├── 03_Screenshots/            — verified preview screenshots.
+├── 04_Internal/server.py      — optional internal server: hosts the widget and caches API calls for shared use.
 └── docs/PROJECT_LOG.md        — project log (goal, status, session history).
 ```
 
@@ -44,6 +45,7 @@ Values may be BVG IBNR stop ids (digits) or plain station names — names are re
 | `rl`  | RE lead time in minutes (one per station, comma-sep.) — hides trains leaving sooner than the walk to that station | `10` |
 | `rf`  | Only these RE lines (comma-separated, substring match, empty = all) | — |
 | `n`   | Departures per direction  | `2` |
+| `api` | BVG API base URL — point at a caching proxy for shared/internal use; relative URLs work same-origin (`/api` when served by the internal server) | `https://v6.bvg.transport.rest` |
 | `scale` | Display scale (0.8–2) — makes everything in the widget proportionally larger/smaller | `1` |
 | `ts` | Info line text size (px, 8–18) | `12` |
 
@@ -62,7 +64,7 @@ shows that honestly for its slot instead of being skipped.
 
 ## Behavior
 
-- Refreshes every 30 seconds; S/U blocks look 30 minutes ahead, the RE block 4 hours (regional service is sparse — a shorter window is often empty).
+- Refreshes every 60 seconds (regional trains barely move faster); S/U blocks look 30 minutes ahead, the RE block 4 hours (regional service is sparse — a shorter window is often empty).
 - The API filters products only by exclusion (`suburban=false&bus=false&...`); the widget builds those queries per block.
 - Shows minutes until departure (`now`, `3 min`, ...) plus the absolute departure time in small dim text (`8 min 18:24`), so it can be cross-checked against the clock header. Beyond 60 minutes only the absolute time is shown (`19:22 *`).
 - Shows delay as `+2` in orange next to the time.
@@ -96,6 +98,32 @@ Requirements:
 - The NUC needs internet access to `https://v6.bvg.transport.rest` (the only external dependency).
 - Station configuration goes in the iframe URL, not the file — so keep the file unmodified for easy updates (just overwrite it when the widget changes).
 
+## Sharing internally (with a cache)
+
+If several colleagues' screens should run the widget, don't let every instance call the public API directly. Run one shared instance of `04_Internal/server.py` on an internal host (or subdomain): it serves the widget files and proxies the API behind a 30-second in-memory cache, so N screens generate at most one upstream request per endpoint and window — and everyone shares the same cache.
+
+```bash
+# one-time: copy server.py, departures.html (and optionally index.html) into one folder
+python3 server.py 8000
+```
+
+Colleagues then embed:
+
+```html
+<iframe id="bvg-widget" src="http://<internal-host>:8000/departures.html?api=/api" ...></iframe>
+```
+
+(`api=/api` is a relative URL — the widget then fetches through the same origin's proxy. It is also a setup-panel field.)
+
+Details:
+
+- **No dependencies** beyond Python's standard library; the cache is in-memory (resets on restart, which is fine at this TTL).
+- **Stale-while-error**: expired entries are kept and served when the public API is unreachable — short outages degrade to slightly old data (`X-Cache-Status: STALE`) instead of errors. The widget's own offline indicator still shows the state honestly.
+- `X-Cache-Status` response header (`MISS` / `HIT` / `STALE`) lets you check the cache is working: `curl -sI "http://localhost:8000/api/stops?query=Humboldthain" | grep X-Cache`.
+- If you'd rather use an existing reverse proxy: an nginx location with `proxy_pass https://v6.bvg.transport.rest/;` and `proxy_cache_valid 200 30s;` gives the same effect; set the widget's `api` param to that location.
+
+Footprint per widget instance: about 6 API calls per minute (2 refreshes × 3 blocks), well under the public instance's 100 requests/minute limit — and with the shared cache, upstream traffic grows with the *number of distinct station configurations*, not the number of screens.
+
 ## Embedding in the real Icinga page
 
 In your Icinga source, add the same fixed-position iframe pointing at the NUC folder's served URL (localhost is fine since the NUC's Chrome opens the Icinga page directly):
@@ -107,7 +135,7 @@ In your Icinga source, add the same fixed-position iframe pointing at the NUC fo
         scrolling="no"></iframe>
 ```
 
-The widget reports its rendered size after every refresh via `postMessage` (type `bvg-widget-size`, with `width`/`height`) — at least once per 30-second cycle even when the size is unchanged, so the messages double as a heartbeat. To make the iframe auto-fit (recommended — it also tracks the display scale and any station changes) and recover a hung widget, add this listener to the parent page:
+The widget reports its rendered size after every refresh via `postMessage` (type `bvg-widget-size`, with `width`/`height`) — at least once per 60-second cycle even when the size is unchanged, so the messages double as a heartbeat. To make the iframe auto-fit (recommended — it also tracks the display scale and any station changes) and recover a hung widget, add this listener to the parent page:
 
 ```html
 <script>
