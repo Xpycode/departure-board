@@ -401,10 +401,11 @@
   // ("warning" remarks) of all displayed trains, one message at a time.
   // The counter ("2/5") jumps to the next message on click, clicking the
   // text cycles the scroll speed (1x -> 2x -> 4x), and a completed scroll
-  // pass auto-advances to the next message. The DOM is only rebuilt when
-  // the message list changes, so routine refreshes and RE station switches
-  // do not restart the running scroll.
+  // pass auto-advances. Message-list updates (e.g. when the RE station
+  // switches) are applied only at the end of the current scroll pass, so
+  // the running text never visibly restarts or blanks.
   var tickerMsgs = [];
+  var tickerNext = null;
   var tickerIdx = 0;
   var tickerSpeed = 1;
   var tickerBaseSec = 15;
@@ -427,9 +428,25 @@
       '<span class="count" title="Next message">' +
       (tickerIdx + 1) + "/" + tickerMsgs.length + "</span>";
     setTickerDuration();
-    tickerEl.querySelector(".scroll").addEventListener("animationiteration", function () {
-      showTickerMsg(tickerIdx + 1);
-    });
+    tickerEl.querySelector(".scroll").addEventListener("animationiteration", onTickerPassEnd);
+  }
+
+  // A full scroll pass completed (the text just exited on the left):
+  // apply any pending message-list change and advance to the next message.
+  function onTickerPassEnd() {
+    if (tickerNext !== null) {
+      var current = tickerMsgs[tickerIdx];
+      tickerMsgs = tickerNext;
+      tickerNext = null;
+      if (!tickerMsgs.length) {
+        tickerEl.style.display = "none";
+        tickerEl.innerHTML = "";
+        return;
+      }
+      if (current && tickerMsgs.indexOf(current) !== -1) tickerIdx = tickerMsgs.indexOf(current);
+      else if (tickerIdx >= tickerMsgs.length) tickerIdx = 0;
+    }
+    showTickerMsg(tickerIdx + 1);
   }
 
   function showTickerMsg(i) {
@@ -455,17 +472,18 @@
       });
     });
     var joined = msgs.join("\u0000");
-    if (joined === tickerMsgs.join("\u0000")) return;
-    var current = tickerMsgs[tickerIdx];
-    tickerMsgs = msgs;
-    if (!msgs.length) {
-      tickerEl.style.display = "none";
-      tickerEl.innerHTML = "";
+    if (tickerNext && joined === tickerNext.join("\u0000")) return;
+    if (joined === tickerMsgs.join("\u0000")) { tickerNext = null; return; }
+    // Nothing displayed yet (or only hidden content): show immediately.
+    if (!tickerMsgs.length) {
+      if (!msgs.length) return;
+      tickerMsgs = msgs;
+      tickerIdx = 0;
+      renderTickerMsg();
       return;
     }
-    if (current && msgs.indexOf(current) !== -1) tickerIdx = msgs.indexOf(current);
-    else if (tickerIdx >= msgs.length) tickerIdx = 0;
-    renderTickerMsg();
+    // Otherwise defer to the end of the current scroll pass.
+    tickerNext = msgs;
   }
 
   function stationName(data, departures, cfg) {
@@ -649,11 +667,17 @@
   // cross-origin via postMessage; the parent decides whether to listen.
   // Measures the widget element: document scroll sizes never shrink below
   // the current iframe size, which froze the frame at its largest size.
+  // Only posts when the size actually changed, so renders that keep the
+  // layout (routine refreshes, ticker updates) do not touch the frame.
+  var lastReportedSize = "";
   function notifySize() {
     if (window.parent === window) return;
     var box = document.getElementById("widget");
-    window.parent.postMessage(
-      { type: "bvg-widget-size", width: box.offsetWidth, height: box.offsetHeight }, "*");
+    var w = box.offsetWidth, h = box.offsetHeight;
+    var key = w + "x" + h;
+    if (key === lastReportedSize) return;
+    lastReportedSize = key;
+    window.parent.postMessage({ type: "bvg-widget-size", width: w, height: h }, "*");
   }
   new MutationObserver(notifySize).observe(document.getElementById("widget"),
     { childList: true, subtree: true, characterData: true });
