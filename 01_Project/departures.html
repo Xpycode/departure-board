@@ -61,6 +61,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .r-countdown {
+    margin-left: auto;
+    padding-left: calc(6px * var(--scale));
+    font-size: calc(10px * var(--scale));
+    color: var(--dim);
+    white-space: nowrap;
+  }
   .station-error {
     font-size: calc(12px * var(--scale));
     color: var(--warn);
@@ -219,7 +226,13 @@
   var REFRESH_MS = 30000;
   var ROTATE_MS = 20000;
   var rIndex = 0;
-  var R_PRODUCTS = ["regional", "regionalExp", "express", "national"];
+  // Product filtering on the BVG v6 API: the per-product booleans
+  // (suburban, subway, tram, bus, ferry, express, regional) are include
+  // flags that all default to true, so filtering happens by excluding
+  // unwanted products with =false. ("express" covers IC/ICE/EC; there are
+  // no regionalExp/national params on this instance.)
+  var PRODUCTS = ["suburban", "subway", "tram", "bus", "ferry", "express", "regional"];
+  var R_PRODUCTS = ["regional", "express"];
   var regionalCfg = { key: "r", label: "RE", el: document.getElementById("station-r") };
   var idCache = {};
 
@@ -228,6 +241,12 @@
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
     });
+  }
+
+  // Query fragment excluding all products not in the keep list.
+  function productsQuery(keep) {
+    return PRODUCTS.filter(function (p) { return keep.indexOf(p) === -1; })
+      .map(function (p) { return p + "=false"; }).join("&");
   }
 
   function mins(dep) {
@@ -277,19 +296,25 @@
       });
     });
 
-    cfg.el.innerHTML =
+    var head =
       '<div class="station-head">' +
       '<span class="badge ' + cfg.key + '">' + cfg.label + "</span>" +
-      '<span class="station-name">' + escapeHtml(stationName(data, departures)) + "</span>" +
-      "</div>" +
+      '<span class="station-name">' + escapeHtml(stationName(data, departures, cfg)) + "</span>";
+    if (cfg.key === "r" && REGIONAL_STOPS.length > 1) {
+      head += '<span class="r-countdown" id="r-countdown"></span>';
+    }
+    head += "</div>";
+    cfg.el.innerHTML = head +
       (rows
         ? "<table><tbody>" + rows + "</tbody></table>"
-        : '<div class="station-error">No departures found</div>');
+        : '<div class="station-error">No departures in the next ' +
+          (cfg.key === "r" ? "90" : "30") + " min</div>");
   }
 
-  function stationName(data, departures) {
+  function stationName(data, departures, cfg) {
     var name = departures.length && departures[0].stop && departures[0].stop.name;
     if (!name) name = data.stop && data.stop.name;
+    if (!name) name = cfg.requestedStop;
     name = (name || "Station").replace(/\s*\(Berlin\)$/, "").replace(/ Bhf$/, "");
     return name;
   }
@@ -330,6 +355,7 @@
   }
 
   function loadDepartures(cfg, stop, query) {
+    cfg.requestedStop = stop;
     return resolveId(stop)
       .then(function (id) {
         return fetchJSON(API + "/stops/" + encodeURIComponent(id) + "/departures?" + query);
@@ -338,7 +364,7 @@
       .catch(function (err) {
         cfg.el.innerHTML =
           '<div class="station-head"><span class="badge ' + cfg.key + '">' + cfg.label +
-          '</span><span class="station-name">—</span></div>' +
+          '</span><span class="station-name">' + escapeHtml(stop) + "</span></div>" +
           '<div class="station-error">API error: ' + escapeHtml(err.message) + "</div>";
         setStatus("API error", true);
       });
@@ -350,14 +376,15 @@
     });
   }
 
-  // Loads the current RE cycling station; if it has no regional departures
-  // (e.g. construction-related gaps at some stations), advance to the next
-  // one instead of showing an empty block for a full rotation slot.
+  // Loads the current RE cycling station. Regional trains run every 20-30+
+  // minutes, so fetch a 90-minute window; if the station still has no
+  // regional departures (e.g. construction gaps), advance to the next one
+  // instead of showing an empty block for a full rotation slot.
   function loadRegional(attempt) {
     if (!REGIONAL_STOPS.length) return;
     attempt = attempt || 0;
     loadDepartures(regionalCfg, REGIONAL_STOPS[rIndex % REGIONAL_STOPS.length],
-      "results=20&regional=true&regionalExp=true&express=true&national=true")
+      "results=20&duration=90&" + productsQuery(R_PRODUCTS))
       .then(function (data) {
         if (!hasRegionalDepartures(data) && REGIONAL_STOPS.length > 1 &&
             attempt < REGIONAL_STOPS.length - 1) {
@@ -369,7 +396,7 @@
 
   function refresh() {
     STOPS.forEach(function (cfg) {
-      loadDepartures(cfg, cfg.stop, "results=20&" + cfg.kind + "=true");
+      loadDepartures(cfg, cfg.stop, "results=20&duration=30&" + productsQuery([cfg.kind]));
     });
     loadRegional();
     document.getElementById("updated").textContent =
@@ -411,7 +438,22 @@
   refresh();
   setInterval(refresh, REFRESH_MS);
   if (REGIONAL_STOPS.length > 1) {
-    setInterval(function () { rIndex++; loadRegional(); }, ROTATE_MS);
+    // One ticker drives the RE rotation: counts down to the next station
+    // switch and shows the remaining seconds in the RE block header.
+    var rSecondsLeft = ROTATE_MS / 1000;
+    setInterval(function () {
+      rSecondsLeft--;
+      if (rSecondsLeft <= 0) {
+        rIndex++;
+        loadRegional();
+        rSecondsLeft = ROTATE_MS / 1000;
+      }
+      var cd = document.getElementById("r-countdown");
+      if (cd) {
+        cd.textContent = "→ " + REGIONAL_STOPS[(rIndex + 1) % REGIONAL_STOPS.length] +
+          " · " + rSecondsLeft + " s";
+      }
+    }, 1000);
   }
 
   // Report the rendered size to the embedding page so the iframe can fit

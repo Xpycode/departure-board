@@ -47,12 +47,15 @@ Example: `departures.html?s=900100003&u=900100053&n=3`
 The third block (red `RE` badge) shows regional trains (RE/RB/IC/ICE) and
 alternates between the configured `r` stops every 20 seconds — useful while
 the Stadtbahn regional platforms (Alexanderplatz) are under construction
-and traffic shifts to Gesundbrunnen. A cycling station with no regional
-departures is skipped immediately in favor of the next one with departures.
+and traffic shifts to Gesundbrunnen. A countdown in the RE header shows the
+next station and the seconds until the switch. A cycling station with no
+regional departures is skipped immediately in favor of the next one with
+departures.
 
 ## Behavior
 
-- Refreshes every 30 seconds.
+- Refreshes every 30 seconds; S/U blocks look 30 minutes ahead, the RE block 90 minutes (regional trains run every 20–30+ minutes, so a shorter window is often empty).
+- The API filters products only by exclusion (`suburban=false&bus=false&...`); the widget builds those queries per block.
 - Shows minutes until departure (`now`, `3 min`, ...); absolute time with `*` if more than 60 minutes out.
 - Shows delay as `+2` in orange next to the time.
 - Departures are grouped per direction (terminus) — up to 2 directions, e.g. eastbound + westbound.
